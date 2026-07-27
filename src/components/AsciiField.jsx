@@ -4,6 +4,7 @@ const CHARACTERS = "@%#*+=-:.?01/\\|{}[]()<>$&;";
 const CELL_WIDTH = 9;
 const CELL_HEIGHT = 12;
 const CURSOR_RADIUS = 32;
+const CURSOR_HOVER_RADIUS = 48;
 const CLOSED_THRESHOLD = 0.3;
 const OPEN_THRESHOLD = 0.58;
 const INPUT_TIMEOUT = 600;
@@ -17,7 +18,7 @@ const MIN_SPAWN_INTERVAL = 2_200;
 const FIXES_PER_LEVEL = 5;
 const MAX_MISSES = 5;
 const MISSED_BUG_PENALTY = 100;
-const BUG_COLORS = ["#ff2bd6", "#d66bff"];
+const BUG_COLORS = ["#ff2d2d", "#ff665c"];
 const GAME_OVER_MESSAGES = [
   "YOU SHOULDN'T BE WORKING HERE.",
   "ASK CLAUDE TO FIX THIS, PLEASE.",
@@ -55,13 +56,30 @@ function createGrid(width, height, time) {
   return cells;
 }
 
-export function AsciiField({ inputRef, onGameStateChange }) {
+export function AsciiField({
+  inputRef,
+  onGameStateChange,
+  paused = false,
+  interactionTargetRef,
+  cursorOverlayRef,
+  onDismiss,
+}) {
   const canvasRef = useRef(null);
   const onGameStateChangeRef = useRef(onGameStateChange);
+  const pausedRef = useRef(paused);
+  const onDismissRef = useRef(onDismiss);
 
   useEffect(() => {
     onGameStateChangeRef.current = onGameStateChange;
   }, [onGameStateChange]);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -70,6 +88,7 @@ export function AsciiField({ inputRef, onGameStateChange }) {
     const context = canvas.getContext("2d");
     const wallCanvas = document.createElement("canvas");
     const wallContext = wallCanvas.getContext("2d");
+    const cursorOverlay = cursorOverlayRef?.current;
     const size = { width: 0, height: 0, dpr: 1 };
     const cursor = {
       x: window.innerWidth * 0.5,
@@ -81,6 +100,8 @@ export function AsciiField({ inputRef, onGameStateChange }) {
       throwVelocityX: 0,
       throwVelocityY: 0,
       throwMotion: 0,
+      radius: CURSOR_RADIUS,
+      fillOpacity: 1,
     };
 
     let cells = [];
@@ -279,10 +300,19 @@ export function AsciiField({ inputRef, onGameStateChange }) {
         cell.bugId = id;
         cell.character = randomCharacter();
       });
+      const left =
+        Math.min(...bugCells.map((cell) => cell.x)) - CELL_WIDTH * 0.5;
+      const right =
+        Math.max(...bugCells.map((cell) => cell.x)) + CELL_WIDTH * 0.5;
+      const top =
+        Math.min(...bugCells.map((cell) => cell.y)) - CELL_HEIGHT * 0.5;
+      const bottom =
+        Math.max(...bugCells.map((cell) => cell.y)) + CELL_HEIGHT * 0.5;
       bugs.push({
         id,
-        x,
-        y,
+        x: (left + right) * 0.5,
+        y: (top + bottom) * 0.5,
+        bounds: { left, right, top, bottom },
         cells: bugCells,
         spawnedAt: time,
         expiresAt: time + BUG_LIFETIME,
@@ -547,30 +577,65 @@ export function AsciiField({ inputRef, onGameStateChange }) {
       return { bug: nearest, distance: nearestDistance };
     }
 
-    function drawProximityLink(nearest, tracked, time) {
+    function findHoveredBug() {
+      return (
+        bugs.find(
+          (bug) =>
+            cursor.x >= bug.bounds.left &&
+            cursor.x <= bug.bounds.right &&
+            cursor.y >= bug.bounds.top &&
+            cursor.y <= bug.bounds.bottom,
+        ) || null
+      );
+    }
+
+    function drawProximityLink(nearest, hoveredBug, tracked, time) {
       if (
         !tracked ||
         !nearest.bug ||
         nearest.distance > PROXIMITY_DISTANCE ||
-        heldBug
+        heldBug ||
+        hoveredBug
       ) {
         return;
       }
 
       const strength = 1 - nearest.distance / PROXIMITY_DISTANCE;
+      const deltaX = nearest.bug.x - cursor.x;
+      const deltaY = nearest.bug.y - cursor.y;
+      const length = Math.max(1, Math.hypot(deltaX, deltaY));
+      const normalX = -deltaY / length;
+      const normalY = deltaX / length;
+      const segments = 14;
       context.save();
-      context.strokeStyle = `rgba(255, 79, 216, ${0.2 + strength * 0.68})`;
-      context.lineWidth = 0.75 + strength;
-      context.setLineDash([2, 5]);
-      context.lineDashOffset = -time * 0.02;
+      context.strokeStyle = `rgba(255, 45, 45, ${0.58 + strength * 0.4})`;
+      context.lineWidth = 1.2 + strength * 1.5;
+      context.shadowColor = "#ff2d2d";
+      context.shadowBlur = 5 + strength * 7;
       context.beginPath();
-      context.moveTo(cursor.x, cursor.y);
-      context.lineTo(nearest.bug.x, nearest.bug.y);
+      for (let index = 0; index <= segments; index += 1) {
+        const progress = index / segments;
+        const envelope = Math.sin(Math.PI * progress);
+        const vibration =
+          (Math.sin(time * 0.024 + index * 1.65) +
+            Math.sin(time * 0.011 - index * 0.9) * 0.55) *
+          (1.5 + strength * 2.8) *
+          envelope;
+        const x = cursor.x + deltaX * progress + normalX * vibration;
+        const y = cursor.y + deltaY * progress + normalY * vibration;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
       context.stroke();
-      context.setLineDash([]);
-      context.fillStyle = "#ff4fd8";
+      context.fillStyle = "#ff2d2d";
       context.beginPath();
-      context.arc(nearest.bug.x, nearest.bug.y, 2 + strength * 2, 0, Math.PI * 2);
+      context.arc(
+        nearest.bug.x,
+        nearest.bug.y,
+        2.5 + strength * 2.5,
+        0,
+        Math.PI * 2,
+      );
       context.fill();
       context.restore();
     }
@@ -578,14 +643,44 @@ export function AsciiField({ inputRef, onGameStateChange }) {
     function drawCursor(tracked) {
       if (!tracked) return;
       context.save();
-      context.fillStyle = "#000000";
+      context.fillStyle = `rgba(0, 0, 0, ${cursor.fillOpacity})`;
       context.strokeStyle = "rgba(255, 255, 255, 0.92)";
       context.lineWidth = 0.75;
       context.beginPath();
-      context.arc(cursor.x, cursor.y, CURSOR_RADIUS, 0, Math.PI * 2);
+      context.arc(cursor.x, cursor.y, cursor.radius, 0, Math.PI * 2);
       context.fill();
       context.stroke();
       context.restore();
+    }
+
+    function isInteractionTargetHovered(tracked) {
+      const target = interactionTargetRef?.current;
+      if (!tracked || !target) return false;
+      const bounds = target.getBoundingClientRect();
+      return (
+        cursor.x >= bounds.left &&
+        cursor.x <= bounds.right &&
+        cursor.y >= bounds.top &&
+        cursor.y <= bounds.bottom
+      );
+    }
+
+    function updateCursorAppearance(delta, hovered) {
+      const targetRadius = hovered ? CURSOR_HOVER_RADIUS : CURSOR_RADIUS;
+      const targetOpacity = hovered ? 0.38 : 1;
+      const follow = Math.min(1, delta * 16);
+      cursor.radius += (targetRadius - cursor.radius) * follow;
+      cursor.fillOpacity += (targetOpacity - cursor.fillOpacity) * follow;
+    }
+
+    function updateCursorOverlay(tracked, source, hovered) {
+      if (!cursorOverlay) return;
+
+      const visible = pausedRef.current && tracked && source === "camera";
+      cursorOverlay.classList.toggle("is-visible", visible);
+      cursorOverlay.classList.toggle("is-hovering", visible && hovered);
+      cursorOverlay.style.left = `${cursor.x}px`;
+      cursorOverlay.style.top = `${cursor.y}px`;
     }
 
     function updateHeld(delta, time) {
@@ -702,12 +797,39 @@ export function AsciiField({ inputRef, onGameStateChange }) {
         );
       }
 
+      const interactionHovered = isInteractionTargetHovered(tracked);
+      updateCursorOverlay(tracked, input.source, interactionHovered);
+
+      if (pausedRef.current) {
+        updateCursorAppearance(delta, interactionHovered);
+        if (
+          handClosed &&
+          !wasClosed &&
+          (input.source === "remote" ||
+            (input.source === "camera" && interactionHovered))
+        ) {
+          onDismissRef.current?.();
+        }
+        wasClosed = handClosed;
+        publishGameState();
+        updateWall(time);
+
+        context.fillStyle = "#000000";
+        context.fillRect(0, 0, size.width, size.height);
+        context.drawImage(wallCanvas, 0, 0, size.width, size.height);
+        drawCursor(tracked);
+        frameId = requestAnimationFrame(render);
+        return;
+      }
+
       const gameWasOver = gameOver;
       updateGame(time, tracked);
       if (gameWasOver && gameOver && handClosed && !wasClosed) {
         restartGame(time);
       }
       const nearest = findNearestBug();
+      const hoveredBug = findHoveredBug();
+      updateCursorAppearance(delta, Boolean(hoveredBug));
 
       if (
         !gameOver &&
@@ -730,7 +852,7 @@ export function AsciiField({ inputRef, onGameStateChange }) {
       context.fillRect(0, 0, size.width, size.height);
       context.drawImage(wallCanvas, 0, 0, size.width, size.height);
       drawBugs(time);
-      drawProximityLink(nearest, tracked, time);
+      drawProximityLink(nearest, hoveredBug, tracked, time);
       drawParticles(time);
       drawCursor(tracked);
       drawHeld();
@@ -748,6 +870,7 @@ export function AsciiField({ inputRef, onGameStateChange }) {
 
     return () => {
       cancelAnimationFrame(frameId);
+      cursorOverlay?.classList.remove("is-visible", "is-hovering");
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerdown", onPointerDown);
@@ -755,7 +878,7 @@ export function AsciiField({ inputRef, onGameStateChange }) {
       canvas.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("pointerleave", onPointerLeave);
     };
-  }, [inputRef]);
+  }, [cursorOverlayRef, inputRef, interactionTargetRef]);
 
   return <canvas ref={canvasRef} className="ascii-field" />;
 }

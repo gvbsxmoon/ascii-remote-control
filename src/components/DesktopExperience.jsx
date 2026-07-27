@@ -21,7 +21,11 @@ export function DesktopExperience() {
   });
   const socketRef = useRef(null);
   const modeRef = useRef("remote");
+  const gameStateRef = useRef(null);
+  const introButtonRef = useRef(null);
+  const introCursorRef = useRef(null);
   const [inputMode, setInputMode] = useState("remote");
+  const [introOpen, setIntroOpen] = useState(true);
   const [room, setRoom] = useState("");
   const [remoteConnected, setRemoteConnected] = useState(false);
   const [serverConnected, setServerConnected] = useState(false);
@@ -37,6 +41,7 @@ export function DesktopExperience() {
     gameOver: false,
     gameOverMessage: "",
   });
+  gameStateRef.current = gameState;
 
   useEffect(() => {
     document.title = "ASCII Remote / Display";
@@ -51,13 +56,23 @@ export function DesktopExperience() {
 
       socket.addEventListener("open", () => {
         setServerConnected(true);
-        sendJson(socket, { type: "create-room" });
+        if (modeRef.current === "remote") {
+          sendJson(socket, { type: "create-room" });
+        }
       });
 
       socket.addEventListener("message", ({ data }) => {
         const message = JSON.parse(data);
         if (message.type === "room-created") {
-          setRoom(message.room);
+          if (modeRef.current === "remote") {
+            setRoom(message.room);
+            sendJson(socket, {
+              type: "game-state",
+              ...gameStateRef.current,
+            });
+          } else {
+            sendJson(socket, { type: "close-room" });
+          }
         } else if (message.type === "peer-status") {
           const connected = Boolean(message.remoteConnected);
           setRemoteConnected(connected);
@@ -94,21 +109,42 @@ export function DesktopExperience() {
   }, []);
 
   const handleGameState = useCallback((nextState) => {
+    gameStateRef.current = nextState;
     setGameState(nextState);
     sendJson(socketRef.current, { type: "game-state", ...nextState });
+  }, []);
+
+  const dismissIntro = useCallback(() => {
+    setIntroOpen(false);
   }, []);
 
   const digits = (room || "------").split("");
 
   function selectInputMode(mode) {
+    if (mode === modeRef.current) return;
     modeRef.current = mode;
     setInputMode(mode);
     inputRef.current.tracked = false;
+
+    if (mode === "camera") {
+      setRoom("");
+      setRemoteConnected(false);
+      sendJson(socketRef.current, { type: "close-room" });
+    } else {
+      sendJson(socketRef.current, { type: "create-room" });
+    }
   }
 
   return (
     <main className="desktop-experience">
-      <AsciiField inputRef={inputRef} onGameStateChange={handleGameState} />
+      <AsciiField
+        inputRef={inputRef}
+        onGameStateChange={handleGameState}
+        paused={introOpen}
+        interactionTargetRef={introButtonRef}
+        cursorOverlayRef={introCursorRef}
+        onDismiss={dismissIntro}
+      />
       {inputMode === "camera" && <CameraInput inputRef={inputRef} />}
 
       <section className="game-hud" aria-live="polite">
@@ -124,12 +160,48 @@ export function DesktopExperience() {
       </section>
 
       {gameState.gameOver && (
-        <section className="game-over" aria-live="assertive">
+        <section className="system-modal game-over" aria-live="assertive">
           <strong>GAME OVER</strong>
           <p>{gameState.gameOverMessage}</p>
-          <span>CLOSE HAND TO REBOOT</span>
+          <span>CLICK, TOUCH OR CLOSE HAND TO REBOOT</span>
         </section>
       )}
+
+      {introOpen && (
+        <div className="intro-layer" onClick={dismissIntro}>
+          <section
+            className="system-modal intro-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="intro-title"
+          >
+            <strong id="intro-title">REMOVE THE BUGS</strong>
+            <p>
+              {inputMode === "camera"
+                ? "MOVE YOUR HAND TO AIM. CLOSE YOUR FIST TO GRAB. OPEN TO THROW."
+                : remoteConnected
+                  ? "TILT TO AIM. HOLD TO GRAB. RELEASE TO THROW."
+                  : "PAIR A REMOTE OR USE THE MOUSE. HOLD TO GRAB. RELEASE TO THROW."}
+            </p>
+            <button
+              ref={introButtonRef}
+              type="button"
+              onClick={dismissIntro}
+            >
+              {inputMode === "camera"
+                ? "AIM HERE + CLOSE FIST"
+                : remoteConnected
+                  ? "TOUCH REMOTE OR CLICK"
+                  : "CLICK TO START"}
+            </button>
+          </section>
+        </div>
+      )}
+      <div
+        ref={introCursorRef}
+        className="intro-hand-cursor"
+        aria-hidden="true"
+      />
 
       <section
         className={`desktop-pairing ${remoteConnected ? "is-connected" : ""} ${inputMode === "camera" ? "is-hidden" : ""}`}

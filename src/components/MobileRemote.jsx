@@ -246,10 +246,11 @@ export function MobileRemote() {
     event.currentTarget.setPointerCapture(event.pointerId);
     holdRef.current = true;
     setPressed(true);
+    sendInput(0);
+    navigator.vibrate?.(10);
     const enabled = await enableSensors();
     if (enabled && holdRef.current) {
       sendInput(0);
-      navigator.vibrate?.(10);
     }
   }
 

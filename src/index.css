@@ -79,14 +79,10 @@ input {
 
 .game-hud .game-status--bug-captured,
 .remote-game-status--bug-captured {
-  color: #ff2bd6;
+  color: #ff3b30;
 }
 
-.game-over {
-  position: fixed;
-  z-index: 3;
-  top: 50%;
-  left: 50%;
+.system-modal {
   display: grid;
   width: min(560px, calc(100vw - 48px));
   justify-items: center;
@@ -95,26 +91,96 @@ input {
   border-block: 1px solid rgba(255, 59, 48, 0.72);
   background: #000;
   text-align: center;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
 }
 
-.game-over strong {
+.system-modal strong {
   color: #ff3b30;
   font-size: 11px;
   font-weight: 400;
   text-shadow: 0 0 10px rgba(255, 59, 48, 0.74);
 }
 
-.game-over p {
+.system-modal p {
   margin: 0;
   color: #fff;
   font-size: clamp(16px, 3vw, 28px);
 }
 
-.game-over span {
+.system-modal > span {
   color: rgba(255, 255, 255, 0.42);
   font-size: 9px;
+}
+
+.game-over {
+  position: fixed;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.intro-layer {
+  position: fixed;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  cursor: default;
+}
+
+.intro-modal {
+  pointer-events: auto;
+}
+
+.intro-modal button {
+  min-width: 148px;
+  height: 30px;
+  padding-inline: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 0;
+  outline: 0;
+  background: #000;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.intro-modal button:hover,
+.intro-modal button:focus-visible {
+  border-color: #ff3b30;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.34);
+}
+
+.intro-hand-cursor {
+  position: fixed;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  width: 64px;
+  height: 64px;
+  border: 0.75px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background: #000;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition:
+    width 120ms ease,
+    height 120ms ease,
+    background-color 120ms ease,
+    opacity 80ms ease;
+  pointer-events: none;
+}
+
+.intro-hand-cursor.is-visible {
+  opacity: 1;
+}
+
+.intro-hand-cursor.is-hovering {
+  width: 96px;
+  height: 96px;
+  background: rgba(0, 0, 0, 0.38);
 }
 
 .desktop-pairing {
@@ -143,7 +209,7 @@ input {
 
 .input-mode {
   position: fixed;
-  z-index: 3;
+  z-index: 8;
   top: 24px;
   right: 24px;
   display: grid;
@@ -208,7 +274,7 @@ input {
 }
 
 .camera-preview--error {
-  border-color: #ff4fd8;
+  border-color: #ff3b30;
 }
 
 .desktop-pairing.is-connected .desktop-code {

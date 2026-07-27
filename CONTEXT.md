@@ -17,7 +17,7 @@ ASCII Remote is a browser game displayed on desktop or Fire TV and controlled
 either by a paired phone or by webcam hand tracking.
 
 The screen is a pure black canvas filled with small, low-opacity monospace ASCII
-characters. Sparse characters briefly flash neon green. Pink and purple ASCII
+characters. Sparse characters briefly flash neon green. Bright red ASCII
 "bugs" appear in the field and must be grabbed and thrown away before they
 expire.
 
@@ -38,18 +38,20 @@ openness. A closed fist grabs; an open hand releases.
 - 9px Share Tech Mono characters at low white opacity.
 - Sparse random neon-green character flashes.
 - 32px black cursor with a thin white border.
-- Bright pink/purple bug blocks with a six-second lifetime.
-- A proximity line connects the cursor to a bug within grab range.
+- Bright red bug blocks with a six-second lifetime.
+- A glowing red line oscillates between the cursor and a bug within grab range.
+- The cursor grows from a 32px to a 48px radius only while directly over a bug,
+  and becomes translucent so the bug remains visible beneath it.
 - Thrown characters use velocity-based physics and fade out as particles.
 - Score, misses, level, active bugs, and game status are tracked.
 - Bugs begin spawning after 1.2 seconds, with shorter intervals at higher
   levels.
 - A level requires five consecutive bug fixes. Missing a bug resets level
   progress and deducts 100 points.
-- Five missed bugs trigger game over with a random hostile message. Closing the
-  hand restarts the game.
+- Five missed bugs trigger game over with a random hostile message. Mouse
+  click, remote touch, or closing the tracked hand restarts the game.
 - Status values include `WAITING`, `HEALTHY`, `BUG DETECTED`,
-  `BUG CAPTURED`, and `BUG MISSED`.
+  `BUG CAPTURED`, `BUG MISSED`, `LEVEL UP`, and `GAME OVER`.
 - Game state, level progress, misses, and game over are mirrored on the paired
   phone.
 - The phone UI has a six-cell code input and one large hold surface. Keep it
@@ -57,6 +59,10 @@ openness. A closed fist grabs; an open hand releases.
 - Mobile browsers automatically show the remote UI.
 - Desktop input mode is a segmented `REMOTE` / `CAMERA` control, with remote as
   the default.
+- An intro modal pauses the game until mouse click, paired remote touch, or a
+  camera-tracked fist closes over its start button.
+- Switching to camera closes and invalidates the pairing room. Switching back
+  to remote creates a new room and pairing code.
 - Camera mode shows a small webcam preview in the bottom-right corner.
 
 ## Architecture
@@ -86,6 +92,7 @@ the room code.
 Display to server:
 
 - `{ "type": "create-room" }`
+- `{ "type": "close-room" }`
 - `{ "type": "game-state", "score": 0, "misses": 0, "level": 1,
   "activeBugs": 0, "status": "HEALTHY" }`
 
@@ -159,8 +166,8 @@ Render account.
 
 ## Design Constraints
 
-- Keep the visual language black, hacker-mono, restrained neon green, and
-  pink/purple for bugs.
+- Keep the visual language black, hacker-mono, restrained neon green, and red
+  for bugs and alerts.
 - Keep the controller UI extremely simple.
 - Remote pairing remains the default input.
 - Preserve the full-screen canvas and avoid card-heavy UI.

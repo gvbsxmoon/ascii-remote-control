@@ -241,6 +241,8 @@ webSocketServer.on("connection", (client) => {
 
     if (message.type === "create-room") {
       createRoom(client);
+    } else if (message.type === "close-room" && client.role === "display") {
+      detach(client);
     } else if (message.type === "join-room") {
       joinRoom(client, String(message.room || ""));
     } else if (message.type === "input") {
