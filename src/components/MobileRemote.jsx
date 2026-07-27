@@ -11,6 +11,12 @@ function initialDigits() {
   );
 }
 
+function formatScore(score) {
+  const value = Math.trunc(Number(score) || 0);
+  const digits = String(Math.abs(value));
+  return value < 0 ? `-${digits.padStart(4, "0")}` : digits.padStart(5, "0");
+}
+
 export function MobileRemote() {
   const [digits, setDigits] = useState(initialDigits);
   const [phase, setPhase] = useState("pairing");
@@ -20,8 +26,13 @@ export function MobileRemote() {
     score: 0,
     misses: 0,
     level: 1,
+    levelProgress: 0,
+    levelTarget: 5,
+    maxMisses: 5,
     activeBugs: 0,
     status: "WAITING",
+    gameOver: false,
+    gameOverMessage: "",
   });
   const inputRefs = useRef([]);
   const socketRef = useRef(null);
@@ -318,7 +329,7 @@ export function MobileRemote() {
       ) : (
         <>
           <header className="remote-header">
-            <span>SCORE {String(gameState.score).padStart(5, "0")}</span>
+            <span>SCORE {formatScore(gameState.score)}</span>
             <strong
               className={`remote-game-status remote-game-status--${gameState.status.toLowerCase().replaceAll(" ", "-")}`}
             >
@@ -334,7 +345,13 @@ export function MobileRemote() {
             onPointerCancel={endHold}
             onContextMenu={(event) => event.preventDefault()}
           >
-            <span>{pressed ? "HOLDING" : "HOLD"}</span>
+            <span className={gameState.gameOver ? "remote-pad__game-over" : ""}>
+              {gameState.gameOver
+                ? gameState.gameOverMessage
+                : pressed
+                  ? "HOLDING"
+                  : "HOLD"}
+            </span>
           </button>
           <footer className="remote-footer">
             <span>{room}</span>
@@ -343,8 +360,10 @@ export function MobileRemote() {
                 ? "MOTION DENIED"
                 : motionState === "requesting"
                   ? "ALLOW MOTION"
+                  : gameState.gameOver
+                    ? "HOLD TO REBOOT"
                   : phase === "ready"
-                    ? `LVL ${String(gameState.level).padStart(2, "0")}`
+                    ? `LVL ${String(gameState.level).padStart(2, "0")} ${gameState.levelProgress}/${gameState.levelTarget}`
                     : "RECONNECTING"}
             </span>
           </footer>

@@ -11,8 +11,25 @@ const PARTICLE_LIFETIME = 1_100;
 const MAX_THROW_SPEED = 1_800;
 const BUG_LIFETIME = 6_000;
 const PROXIMITY_DISTANCE = 180;
-const LEVEL_DURATION = 45_000;
-const BUG_COLORS = ["#ff4fd8", "#a855f7"];
+const FIRST_BUG_DELAY = 1_200;
+const BASE_SPAWN_INTERVAL = 3_800;
+const MIN_SPAWN_INTERVAL = 2_200;
+const FIXES_PER_LEVEL = 5;
+const MAX_MISSES = 5;
+const MISSED_BUG_PENALTY = 100;
+const BUG_COLORS = ["#ff2bd6", "#d66bff"];
+const GAME_OVER_MESSAGES = [
+  "YOU SHOULDN'T BE WORKING HERE.",
+  "ASK CLAUDE TO FIX THIS, PLEASE.",
+  "PRODUCTION WAS SAFER WITHOUT YOU.",
+  "YOUR CODE REVIEW WAS AN ACT OF VIOLENCE.",
+  "SOMEHOW, YOU MADE LEGACY CODE LOOK GOOD.",
+  "THE INTERN WOULD HAVE FIXED THIS BY NOW.",
+  "PLEASE STEP AWAY FROM THE KEYBOARD.",
+  "EVEN THE STACK TRACE GAVE UP.",
+  "QA SAW THAT. QA REMEMBERS.",
+  "PRODUCTION ACCESS REVOKED. EMOTIONALLY.",
+];
 
 function randomCharacter() {
   return CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
@@ -84,8 +101,11 @@ export function AsciiField({ inputRef, onGameStateChange }) {
     let score = 0;
     let misses = 0;
     let level = 1;
+    let levelProgress = 0;
     let status = "WAITING";
     let statusUntil = 0;
+    let gameOver = false;
+    let gameOverMessage = "";
     let lastPublishedState = "";
 
     function configureText(target) {
@@ -135,8 +155,8 @@ export function AsciiField({ inputRef, onGameStateChange }) {
       bugs = [];
       heldBug = null;
       heldCharacters = [];
-      if (gameStartedAt > 0) {
-        nextBugAt = performance.now() + 2_500;
+      if (gameStartedAt > 0 && !gameOver) {
+        nextBugAt = performance.now() + FIRST_BUG_DELAY;
         status = "HEALTHY";
       }
       wallDirty = true;
@@ -210,13 +230,25 @@ export function AsciiField({ inputRef, onGameStateChange }) {
         ? Math.max(0, Math.ceil((heldBug.expiresAt - time) / 1_000)) * 10
         : 0;
       score += 100 + timeBonus;
+      levelProgress += 1;
       heldBug = null;
       heldCharacters = [];
-      status = bugs.length > 0 ? "BUG DETECTED" : "HEALTHY";
-      statusUntil = time + 1_400;
+      nextBugAt = Math.min(nextBugAt, time + 1_200);
+
+      if (levelProgress >= FIXES_PER_LEVEL) {
+        level += 1;
+        levelProgress = 0;
+        status = "LEVEL UP";
+        statusUntil = time + 1_600;
+      } else {
+        status = bugs.length > 0 ? "BUG DETECTED" : "HEALTHY";
+        statusUntil = time + 1_200;
+      }
     }
 
     function spawnBug(time) {
+      if (gameOver) return;
+
       const widthInCells = 5 + Math.floor(Math.random() * 4);
       const heightInCells = 3 + Math.floor(Math.random() * 3);
       let x;
@@ -265,8 +297,13 @@ export function AsciiField({ inputRef, onGameStateChange }) {
         score,
         misses,
         level,
+        levelProgress,
+        levelTarget: FIXES_PER_LEVEL,
+        maxMisses: MAX_MISSES,
         activeBugs: bugs.length + (heldBug ? 1 : 0),
         status,
+        gameOver,
+        gameOverMessage,
       };
       const serialized = JSON.stringify(nextState);
       if (serialized === lastPublishedState) return;
@@ -274,18 +311,70 @@ export function AsciiField({ inputRef, onGameStateChange }) {
       onGameStateChangeRef.current?.(nextState);
     }
 
+    function endGame(time) {
+      gameOver = true;
+      gameOverMessage =
+        GAME_OVER_MESSAGES[
+          Math.floor(Math.random() * GAME_OVER_MESSAGES.length)
+        ];
+      status = "GAME OVER";
+      statusUntil = Number.POSITIVE_INFINITY;
+      nextBugAt = Number.POSITIVE_INFINITY;
+
+      bugs.forEach((bug) => {
+        bug.cells.forEach((cell) => {
+          cell.bugId = null;
+          cell.character = randomCharacter();
+          cell.nextChange = time + 250 + Math.random() * 1_200;
+        });
+      });
+      bugs = [];
+      heldBug = null;
+      heldCharacters = [];
+      wallDirty = true;
+    }
+
+    function restartGame(time) {
+      bugs.forEach((bug) => {
+        bug.cells.forEach((cell) => {
+          cell.bugId = null;
+          cell.character = randomCharacter();
+        });
+      });
+      bugs = [];
+      heldBug = null;
+      heldCharacters = [];
+      particles = [];
+      score = 0;
+      misses = 0;
+      level = 1;
+      levelProgress = 0;
+      status = "HEALTHY";
+      statusUntil = 0;
+      gameOver = false;
+      gameOverMessage = "";
+      gameStartedAt = time;
+      nextBugAt = time + FIRST_BUG_DELAY;
+      wallDirty = true;
+      publishGameState();
+    }
+
     function updateGame(time, tracked) {
+      if (gameOver) {
+        publishGameState();
+        return;
+      }
+
       if (gameStartedAt === 0) {
         if (tracked) {
           gameStartedAt = time;
-          nextBugAt = time + 3_000;
+          nextBugAt = time + FIRST_BUG_DELAY;
           status = "HEALTHY";
         }
         publishGameState();
         return;
       }
 
-      level = 1 + Math.floor((time - gameStartedAt) / LEVEL_DURATION);
       const expired = bugs.filter((bug) => time >= bug.expiresAt);
       if (expired.length > 0) {
         expired.forEach((bug) => {
@@ -297,16 +386,32 @@ export function AsciiField({ inputRef, onGameStateChange }) {
         const expiredIds = new Set(expired.map((bug) => bug.id));
         bugs = bugs.filter((bug) => !expiredIds.has(bug.id));
         misses += expired.length;
+        score -= expired.length * MISSED_BUG_PENALTY;
+        levelProgress = 0;
         status = "BUG MISSED";
         statusUntil = time + 1_600;
+        nextBugAt = Math.min(nextBugAt, time + 800);
         wallDirty = true;
+
+        if (misses >= MAX_MISSES) {
+          endGame(time);
+          publishGameState();
+          return;
+        }
       }
 
-      const maximumBugs = 1 + Math.floor((level - 1) / 3);
-      const spawnInterval = Math.max(6_500, 10_500 - (level - 1) * 600);
+      const maximumBugs = Math.min(4, 1 + Math.floor((level - 1) / 2));
+      const spawnInterval = Math.max(
+        MIN_SPAWN_INTERVAL,
+        BASE_SPAWN_INTERVAL - (level - 1) * 250,
+      );
       if (time >= nextBugAt) {
-        if (bugs.length < maximumBugs && !heldBug) spawnBug(time);
-        nextBugAt = time + spawnInterval;
+        if (bugs.length < maximumBugs && !heldBug) {
+          spawnBug(time);
+          nextBugAt = time + spawnInterval;
+        } else {
+          nextBugAt = time + 450;
+        }
       }
 
       if (!heldBug && time >= statusUntil) {
@@ -413,15 +518,16 @@ export function AsciiField({ inputRef, onGameStateChange }) {
         const remaining = Math.max(0, (bug.expiresAt - time) / BUG_LIFETIME);
         const urgency = 1 - remaining;
         const pulse =
-          0.68 +
-          Math.sin(time * (0.006 + urgency * 0.012) + bug.id) * 0.28;
+          0.9 +
+          Math.sin(time * (0.006 + urgency * 0.012) + bug.id) * 0.1;
 
         bug.cells.forEach((cell, index) => {
           context.save();
           context.globalAlpha = pulse;
           context.fillStyle = BUG_COLORS[index % BUG_COLORS.length];
           context.shadowColor = context.fillStyle;
-          context.shadowBlur = 6 + urgency * 7;
+          context.shadowBlur = 12 + urgency * 10;
+          context.fillText(cell.character, cell.x, cell.y);
           context.fillText(cell.character, cell.x, cell.y);
           context.restore();
         });
@@ -596,17 +702,22 @@ export function AsciiField({ inputRef, onGameStateChange }) {
         );
       }
 
+      const gameWasOver = gameOver;
       updateGame(time, tracked);
+      if (gameWasOver && gameOver && handClosed && !wasClosed) {
+        restartGame(time);
+      }
       const nearest = findNearestBug();
 
       if (
+        !gameOver &&
         handClosed &&
         !wasClosed &&
         nearest.bug &&
         nearest.distance <= PROXIMITY_DISTANCE
       ) {
         grabBug(nearest.bug, time);
-      } else if (!handClosed && wasClosed) {
+      } else if (!gameOver && !handClosed && wasClosed) {
         releaseCharacters(time);
       }
       wasClosed = handClosed;

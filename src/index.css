@@ -67,13 +67,54 @@ input {
   font-weight: 400;
 }
 
-.game-status--bug-detected,
-.game-status--bug-captured,
-.game-status--bug-missed,
+.game-hud .game-status--bug-detected,
+.game-hud .game-status--bug-missed,
+.game-hud .game-status--game-over,
 .remote-game-status--bug-detected,
-.remote-game-status--bug-captured,
-.remote-game-status--bug-missed {
-  color: #ff4fd8;
+.remote-game-status--bug-missed,
+.remote-game-status--game-over {
+  color: #ff3b30;
+  text-shadow: 0 0 8px rgba(255, 59, 48, 0.72);
+}
+
+.game-hud .game-status--bug-captured,
+.remote-game-status--bug-captured {
+  color: #ff2bd6;
+}
+
+.game-over {
+  position: fixed;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: min(560px, calc(100vw - 48px));
+  justify-items: center;
+  gap: 12px;
+  padding: 18px 24px;
+  border-block: 1px solid rgba(255, 59, 48, 0.72);
+  background: #000;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.game-over strong {
+  color: #ff3b30;
+  font-size: 11px;
+  font-weight: 400;
+  text-shadow: 0 0 10px rgba(255, 59, 48, 0.74);
+}
+
+.game-over p {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(16px, 3vw, 28px);
+}
+
+.game-over span {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 9px;
 }
 
 .desktop-pairing {
@@ -124,10 +165,12 @@ input {
 }
 
 .input-mode button + button {
-  border-left: 0;
+  margin-left: -1px;
 }
 
 .input-mode button.is-active {
+  position: relative;
+  z-index: 1;
   border-color: rgba(255, 255, 255, 0.82);
   color: #fff;
 }
@@ -332,6 +375,14 @@ input {
 
 .remote-pad span {
   font-size: 11px;
+}
+
+.remote-pad .remote-pad__game-over {
+  width: 72%;
+  color: #ff3b30;
+  font-size: clamp(13px, 4.2vw, 18px);
+  line-height: 1.25;
+  text-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
 }
 
 .mobile-remote.is-pressed .remote-pad {

@@ -38,14 +38,20 @@ openness. A closed fist grabs; an open hand releases.
 - 9px Share Tech Mono characters at low white opacity.
 - Sparse random neon-green character flashes.
 - 32px black cursor with a thin white border.
-- Pink/purple bug blocks with a six-second lifetime.
+- Bright pink/purple bug blocks with a six-second lifetime.
 - A proximity line connects the cursor to a bug within grab range.
 - Thrown characters use velocity-based physics and fade out as particles.
 - Score, misses, level, active bugs, and game status are tracked.
-- Difficulty increases gradually every 45 seconds.
+- Bugs begin spawning after 1.2 seconds, with shorter intervals at higher
+  levels.
+- A level requires five consecutive bug fixes. Missing a bug resets level
+  progress and deducts 100 points.
+- Five missed bugs trigger game over with a random hostile message. Closing the
+  hand restarts the game.
 - Status values include `WAITING`, `HEALTHY`, `BUG DETECTED`,
   `BUG CAPTURED`, and `BUG MISSED`.
-- Game state is mirrored on the paired phone.
+- Game state, level progress, misses, and game over are mirrored on the paired
+  phone.
 - The phone UI has a six-cell code input and one large hold surface. Keep it
   visually minimal and do not restore the old overlapping center dot.
 - Mobile browsers automatically show the remote UI.

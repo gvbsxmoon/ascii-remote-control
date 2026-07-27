@@ -3,6 +3,12 @@ import { AsciiField } from "./AsciiField";
 import { CameraInput } from "./CameraInput";
 import { getWebSocketUrl, sendJson } from "../lib/realtime";
 
+function formatScore(score) {
+  const value = Math.trunc(Number(score) || 0);
+  const digits = String(Math.abs(value));
+  return value < 0 ? `-${digits.padStart(4, "0")}` : digits.padStart(5, "0");
+}
+
 export function DesktopExperience() {
   const inputRef = useRef({
     tracked: false,
@@ -23,8 +29,13 @@ export function DesktopExperience() {
     score: 0,
     misses: 0,
     level: 1,
+    levelProgress: 0,
+    levelTarget: 5,
+    maxMisses: 5,
     activeBugs: 0,
     status: "WAITING",
+    gameOver: false,
+    gameOverMessage: "",
   });
 
   useEffect(() => {
@@ -101,12 +112,24 @@ export function DesktopExperience() {
       {inputMode === "camera" && <CameraInput inputRef={inputRef} />}
 
       <section className="game-hud" aria-live="polite">
-        <span>SCORE {String(gameState.score).padStart(5, "0")}</span>
+        <span>SCORE {formatScore(gameState.score)}</span>
         <strong className={`game-status game-status--${gameState.status.toLowerCase().replaceAll(" ", "-")}`}>
           {gameState.status}
         </strong>
-        <span>LVL {String(gameState.level).padStart(2, "0")}</span>
+        <span>
+          LVL {String(gameState.level).padStart(2, "0")}{" "}
+          {gameState.levelProgress}/{gameState.levelTarget}
+        </span>
+        <span>ERR {gameState.misses}/{gameState.maxMisses}</span>
       </section>
+
+      {gameState.gameOver && (
+        <section className="game-over" aria-live="assertive">
+          <strong>GAME OVER</strong>
+          <p>{gameState.gameOverMessage}</p>
+          <span>CLOSE HAND TO REBOOT</span>
+        </section>
+      )}
 
       <section
         className={`desktop-pairing ${remoteConnected ? "is-connected" : ""} ${inputMode === "camera" ? "is-hidden" : ""}`}

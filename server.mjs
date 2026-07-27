@@ -204,11 +204,22 @@ function forwardGameState(client, message) {
 
   room.gameState = {
     type: "game-state",
-    score: Math.max(0, Math.floor(Number(message.score) || 0)),
+    score: Math.max(
+      -999_999,
+      Math.min(999_999, Math.floor(Number(message.score) || 0)),
+    ),
     misses: Math.max(0, Math.floor(Number(message.misses) || 0)),
     level: Math.max(1, Math.floor(Number(message.level) || 1)),
+    levelProgress: Math.max(
+      0,
+      Math.floor(Number(message.levelProgress) || 0),
+    ),
+    levelTarget: Math.max(1, Math.floor(Number(message.levelTarget) || 5)),
+    maxMisses: Math.max(1, Math.floor(Number(message.maxMisses) || 5)),
     activeBugs: Math.max(0, Math.floor(Number(message.activeBugs) || 0)),
     status: String(message.status || "WAITING").slice(0, 24),
+    gameOver: Boolean(message.gameOver),
+    gameOverMessage: String(message.gameOverMessage || "").slice(0, 96),
   };
   send(room.remote, room.gameState);
 }
