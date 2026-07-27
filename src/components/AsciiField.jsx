@@ -9,6 +9,10 @@ const OPEN_THRESHOLD = 0.58;
 const INPUT_TIMEOUT = 600;
 const PARTICLE_LIFETIME = 1_100;
 const MAX_THROW_SPEED = 1_800;
+const BUG_LIFETIME = 6_000;
+const PROXIMITY_DISTANCE = 180;
+const LEVEL_DURATION = 45_000;
+const BUG_COLORS = ["#ff4fd8", "#a855f7"];
 
 function randomCharacter() {
   return CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
@@ -23,6 +27,7 @@ function createGrid(width, height, time) {
         x,
         y,
         character: randomCharacter(),
+        bugId: null,
         hidden: false,
         flashUntil: 0,
         nextChange: time + 120 + Math.random() * 1_500,
@@ -33,8 +38,13 @@ function createGrid(width, height, time) {
   return cells;
 }
 
-export function AsciiField({ inputRef }) {
+export function AsciiField({ inputRef, onGameStateChange }) {
   const canvasRef = useRef(null);
+  const onGameStateChangeRef = useRef(onGameStateChange);
+
+  useEffect(() => {
+    onGameStateChangeRef.current = onGameStateChange;
+  }, [onGameStateChange]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -57,6 +67,8 @@ export function AsciiField({ inputRef }) {
     };
 
     let cells = [];
+    let bugs = [];
+    let heldBug = null;
     let heldCharacters = [];
     let particles = [];
     let handClosed = false;
@@ -66,6 +78,15 @@ export function AsciiField({ inputRef }) {
     let nextWallFrame = 0;
     let frameId;
     let previousTime = performance.now();
+    let gameStartedAt = 0;
+    let nextBugAt = Number.POSITIVE_INFINITY;
+    let bugSequence = 0;
+    let score = 0;
+    let misses = 0;
+    let level = 1;
+    let status = "WAITING";
+    let statusUntil = 0;
+    let lastPublishedState = "";
 
     function configureText(target) {
       target.font =
@@ -111,52 +132,45 @@ export function AsciiField({ inputRef }) {
       });
 
       cells = createGrid(size.width, size.height, performance.now());
+      bugs = [];
+      heldBug = null;
+      heldCharacters = [];
+      if (gameStartedAt > 0) {
+        nextBugAt = performance.now() + 2_500;
+        status = "HEALTHY";
+      }
       wallDirty = true;
     }
 
-    function regenerateSource() {
-      heldCharacters.forEach((character) => {
-        const cell = character.sourceCell;
-        cell.character = randomCharacter();
-        cell.hidden = false;
-        cell.nextChange = performance.now() + 250 + Math.random() * 1_200;
-      });
-      wallDirty = true;
-    }
-
-    function grabCharacters() {
-      const radiusSquared = CURSOR_RADIUS * CURSOR_RADIUS;
-      const captured = [];
-
-      cells.forEach((cell) => {
-        if (cell.hidden) return;
-        const dx = cell.x - cursor.x;
-        const dy = cell.y - cursor.y;
-        if (dx * dx + dy * dy > radiusSquared) return;
-
-        cell.hidden = true;
-        captured.push({
+    function grabBug(bug, time) {
+      if (!bug) return;
+      bugs = bugs.filter((candidate) => candidate.id !== bug.id);
+      heldBug = bug;
+      heldCharacters = bug.cells.map((cell, index) => {
+        const captured = {
           character: cell.character,
-          offsetX: dx,
-          offsetY: dy,
+          color: BUG_COLORS[index % BUG_COLORS.length],
+          offsetX: cell.x - bug.x,
+          offsetY: cell.y - bug.y,
           x: cell.x,
           y: cell.y,
-          sourceCell: cell,
-        });
+        };
+        cell.bugId = null;
+        cell.character = randomCharacter();
+        cell.nextChange = time + 250 + Math.random() * 1_200;
+        return captured;
       });
-
-      heldCharacters = captured;
       cursor.throwVelocityX = cursor.velocityX;
       cursor.throwVelocityY = cursor.velocityY;
       cursor.throwMotion = 0;
+      status = "BUG CAPTURED";
+      statusUntil = Number.POSITIVE_INFINITY;
       wallDirty = true;
     }
 
-    function releaseCharacters() {
+    function releaseCharacters(time) {
       if (heldCharacters.length === 0) return;
-      regenerateSource();
 
-      const releaseTime = performance.now();
       const rawThrowSpeed = Math.hypot(
         cursor.throwVelocityX,
         cursor.throwVelocityY,
@@ -187,11 +201,118 @@ export function AsciiField({ inputRef }) {
           vy: throwVelocityY * 0.72 + Math.sin(angle) * radialSpeed,
           rotation: 0,
           angularVelocity: (Math.random() - 0.5) * 5,
-          bornAt: releaseTime,
+          color: character.color,
+          bornAt: time,
         });
       });
 
+      const timeBonus = heldBug
+        ? Math.max(0, Math.ceil((heldBug.expiresAt - time) / 1_000)) * 10
+        : 0;
+      score += 100 + timeBonus;
+      heldBug = null;
       heldCharacters = [];
+      status = bugs.length > 0 ? "BUG DETECTED" : "HEALTHY";
+      statusUntil = time + 1_400;
+    }
+
+    function spawnBug(time) {
+      const widthInCells = 5 + Math.floor(Math.random() * 4);
+      const heightInCells = 3 + Math.floor(Math.random() * 3);
+      let x;
+      let y;
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        x = 90 + Math.random() * Math.max(1, size.width - 180);
+        y = 100 + Math.random() * Math.max(1, size.height - 190);
+        const clear = bugs.every(
+          (bug) => Math.hypot(bug.x - x, bug.y - y) > 190,
+        );
+        if (clear) break;
+      }
+
+      const halfWidth = widthInCells * CELL_WIDTH * 0.5;
+      const halfHeight = heightInCells * CELL_HEIGHT * 0.5;
+      const bugCells = cells.filter(
+        (cell) =>
+          !cell.hidden &&
+          !cell.bugId &&
+          Math.abs(cell.x - x) <= halfWidth &&
+          Math.abs(cell.y - y) <= halfHeight,
+      );
+      if (bugCells.length === 0) return;
+
+      const id = ++bugSequence;
+      bugCells.forEach((cell) => {
+        cell.bugId = id;
+        cell.character = randomCharacter();
+      });
+      bugs.push({
+        id,
+        x,
+        y,
+        cells: bugCells,
+        spawnedAt: time,
+        expiresAt: time + BUG_LIFETIME,
+      });
+      status = "BUG DETECTED";
+      statusUntil = 0;
+      wallDirty = true;
+    }
+
+    function publishGameState() {
+      const nextState = {
+        score,
+        misses,
+        level,
+        activeBugs: bugs.length + (heldBug ? 1 : 0),
+        status,
+      };
+      const serialized = JSON.stringify(nextState);
+      if (serialized === lastPublishedState) return;
+      lastPublishedState = serialized;
+      onGameStateChangeRef.current?.(nextState);
+    }
+
+    function updateGame(time, tracked) {
+      if (gameStartedAt === 0) {
+        if (tracked) {
+          gameStartedAt = time;
+          nextBugAt = time + 3_000;
+          status = "HEALTHY";
+        }
+        publishGameState();
+        return;
+      }
+
+      level = 1 + Math.floor((time - gameStartedAt) / LEVEL_DURATION);
+      const expired = bugs.filter((bug) => time >= bug.expiresAt);
+      if (expired.length > 0) {
+        expired.forEach((bug) => {
+          bug.cells.forEach((cell) => {
+            cell.bugId = null;
+            cell.character = randomCharacter();
+          });
+        });
+        const expiredIds = new Set(expired.map((bug) => bug.id));
+        bugs = bugs.filter((bug) => !expiredIds.has(bug.id));
+        misses += expired.length;
+        status = "BUG MISSED";
+        statusUntil = time + 1_600;
+        wallDirty = true;
+      }
+
+      const maximumBugs = 1 + Math.floor((level - 1) / 3);
+      const spawnInterval = Math.max(6_500, 10_500 - (level - 1) * 600);
+      if (time >= nextBugAt) {
+        if (bugs.length < maximumBugs && !heldBug) spawnBug(time);
+        nextBugAt = time + spawnInterval;
+      }
+
+      if (!heldBug && time >= statusUntil) {
+        status = bugs.length > 0 ? "BUG DETECTED" : "HEALTHY";
+      }
+      publishGameState();
     }
 
     function updateWall(time) {
@@ -201,14 +322,14 @@ export function AsciiField({ inputRef }) {
         const flashCount = Math.random() < 0.2 ? 2 : 1;
         for (let index = 0; index < flashCount; index += 1) {
           const cell = cells[Math.floor(Math.random() * cells.length)];
-          if (cell && !cell.hidden) {
+          if (cell && !cell.hidden && !cell.bugId) {
             cell.flashUntil = time + 120 + Math.random() * 260;
           }
         }
       }
 
       cells.forEach((cell) => {
-        if (!cell.hidden && time >= cell.nextChange) {
+        if (!cell.hidden && !cell.bugId && time >= cell.nextChange) {
           cell.character = randomCharacter();
           cell.nextChange = time + 120 + Math.random() * 1_500;
         }
@@ -218,7 +339,7 @@ export function AsciiField({ inputRef }) {
       configureText(wallContext);
       wallContext.fillStyle = "rgba(255, 255, 255, 0.28)";
       cells.forEach((cell) => {
-        if (!cell.hidden && cell.flashUntil <= time) {
+        if (!cell.hidden && !cell.bugId && cell.flashUntil <= time) {
           wallContext.fillText(cell.character, cell.x, cell.y);
         }
       });
@@ -227,7 +348,7 @@ export function AsciiField({ inputRef }) {
       wallContext.shadowColor = "#39ff14";
       wallContext.shadowBlur = 7;
       cells.forEach((cell) => {
-        if (!cell.hidden && cell.flashUntil > time) {
+        if (!cell.hidden && !cell.bugId && cell.flashUntil > time) {
           wallContext.fillText(cell.character, cell.x, cell.y);
         }
       });
@@ -269,8 +390,8 @@ export function AsciiField({ inputRef }) {
 
     function drawParticles(time) {
       configureText(context);
-      context.fillStyle = "#ffffff";
       particles.forEach((character) => {
+        context.fillStyle = character.color || "#ffffff";
         const progress = Math.min(
           1,
           (time - character.bornAt) / PARTICLE_LIFETIME,
@@ -284,6 +405,68 @@ export function AsciiField({ inputRef }) {
           1 - progress * progress,
         );
       });
+    }
+
+    function drawBugs(time) {
+      configureText(context);
+      bugs.forEach((bug) => {
+        const remaining = Math.max(0, (bug.expiresAt - time) / BUG_LIFETIME);
+        const urgency = 1 - remaining;
+        const pulse =
+          0.68 +
+          Math.sin(time * (0.006 + urgency * 0.012) + bug.id) * 0.28;
+
+        bug.cells.forEach((cell, index) => {
+          context.save();
+          context.globalAlpha = pulse;
+          context.fillStyle = BUG_COLORS[index % BUG_COLORS.length];
+          context.shadowColor = context.fillStyle;
+          context.shadowBlur = 6 + urgency * 7;
+          context.fillText(cell.character, cell.x, cell.y);
+          context.restore();
+        });
+      });
+    }
+
+    function findNearestBug() {
+      let nearest = null;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      bugs.forEach((bug) => {
+        const distance = Math.hypot(cursor.x - bug.x, cursor.y - bug.y);
+        if (distance < nearestDistance) {
+          nearest = bug;
+          nearestDistance = distance;
+        }
+      });
+      return { bug: nearest, distance: nearestDistance };
+    }
+
+    function drawProximityLink(nearest, tracked, time) {
+      if (
+        !tracked ||
+        !nearest.bug ||
+        nearest.distance > PROXIMITY_DISTANCE ||
+        heldBug
+      ) {
+        return;
+      }
+
+      const strength = 1 - nearest.distance / PROXIMITY_DISTANCE;
+      context.save();
+      context.strokeStyle = `rgba(255, 79, 216, ${0.2 + strength * 0.68})`;
+      context.lineWidth = 0.75 + strength;
+      context.setLineDash([2, 5]);
+      context.lineDashOffset = -time * 0.02;
+      context.beginPath();
+      context.moveTo(cursor.x, cursor.y);
+      context.lineTo(nearest.bug.x, nearest.bug.y);
+      context.stroke();
+      context.setLineDash([]);
+      context.fillStyle = "#ff4fd8";
+      context.beginPath();
+      context.arc(nearest.bug.x, nearest.bug.y, 2 + strength * 2, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
     }
 
     function drawCursor(tracked) {
@@ -318,10 +501,13 @@ export function AsciiField({ inputRef }) {
 
     function drawHeld() {
       configureText(context);
-      context.fillStyle = "#ffffff";
       heldCharacters.forEach((character) => {
+        context.fillStyle = character.color || "#ffffff";
+        context.shadowColor = context.fillStyle;
+        context.shadowBlur = 7;
         drawCharacter(context, character.character, character.x, character.y);
       });
+      context.shadowBlur = 0;
     }
 
     function setPointerInput(event, openness) {
@@ -410,10 +596,18 @@ export function AsciiField({ inputRef }) {
         );
       }
 
-      if (handClosed && !wasClosed) {
-        grabCharacters();
+      updateGame(time, tracked);
+      const nearest = findNearestBug();
+
+      if (
+        handClosed &&
+        !wasClosed &&
+        nearest.bug &&
+        nearest.distance <= PROXIMITY_DISTANCE
+      ) {
+        grabBug(nearest.bug, time);
       } else if (!handClosed && wasClosed) {
-        releaseCharacters();
+        releaseCharacters(time);
       }
       wasClosed = handClosed;
 
@@ -424,6 +618,8 @@ export function AsciiField({ inputRef }) {
       context.fillStyle = "#000000";
       context.fillRect(0, 0, size.width, size.height);
       context.drawImage(wallCanvas, 0, 0, size.width, size.height);
+      drawBugs(time);
+      drawProximityLink(nearest, tracked, time);
       drawParticles(time);
       drawCursor(tracked);
       drawHeld();

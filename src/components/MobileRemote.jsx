@@ -16,6 +16,13 @@ export function MobileRemote() {
   const [phase, setPhase] = useState("pairing");
   const [pressed, setPressed] = useState(false);
   const [motionState, setMotionState] = useState("idle");
+  const [gameState, setGameState] = useState({
+    score: 0,
+    misses: 0,
+    level: 1,
+    activeBugs: 0,
+    status: "WAITING",
+  });
   const inputRefs = useRef([]);
   const socketRef = useRef(null);
   const joinedRef = useRef(false);
@@ -77,6 +84,8 @@ export function MobileRemote() {
           rejected = true;
           joinedRef.current = false;
           setPhase("invalid");
+        } else if (message.type === "game-state") {
+          setGameState(message);
         }
       });
 
@@ -309,7 +318,12 @@ export function MobileRemote() {
       ) : (
         <>
           <header className="remote-header">
-            <span>{room}</span>
+            <span>SCORE {String(gameState.score).padStart(5, "0")}</span>
+            <strong
+              className={`remote-game-status remote-game-status--${gameState.status.toLowerCase().replaceAll(" ", "-")}`}
+            >
+              {gameState.status}
+            </strong>
             <i className={phase === "ready" ? "is-online" : ""} />
           </header>
           <button
@@ -323,13 +337,16 @@ export function MobileRemote() {
             <span>{pressed ? "HOLDING" : "HOLD"}</span>
           </button>
           <footer className="remote-footer">
-            {motionState === "denied"
-              ? "MOTION DENIED"
-              : motionState === "requesting"
-                ? "ALLOW MOTION"
-              : phase === "ready"
-                ? "REMOTE ONLINE"
-                : "RECONNECTING"}
+            <span>{room}</span>
+            <span>
+              {motionState === "denied"
+                ? "MOTION DENIED"
+                : motionState === "requesting"
+                  ? "ALLOW MOTION"
+                  : phase === "ready"
+                    ? `LVL ${String(gameState.level).padStart(2, "0")}`
+                    : "RECONNECTING"}
+            </span>
           </footer>
         </>
       )}

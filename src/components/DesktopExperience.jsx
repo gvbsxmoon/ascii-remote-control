@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AsciiField } from "./AsciiField";
+import { CameraInput } from "./CameraInput";
 import { getWebSocketUrl, sendJson } from "../lib/realtime";
 
 export function DesktopExperience() {
@@ -12,9 +13,19 @@ export function DesktopExperience() {
     receivedAt: 0,
     source: "remote",
   });
+  const socketRef = useRef(null);
+  const modeRef = useRef("remote");
+  const [inputMode, setInputMode] = useState("remote");
   const [room, setRoom] = useState("");
   const [remoteConnected, setRemoteConnected] = useState(false);
   const [serverConnected, setServerConnected] = useState(false);
+  const [gameState, setGameState] = useState({
+    score: 0,
+    misses: 0,
+    level: 1,
+    activeBugs: 0,
+    status: "WAITING",
+  });
 
   useEffect(() => {
     document.title = "ASCII Remote / Display";
@@ -25,6 +36,7 @@ export function DesktopExperience() {
     function connect() {
       if (cancelled) return;
       socket = new WebSocket(getWebSocketUrl());
+      socketRef.current = socket;
 
       socket.addEventListener("open", () => {
         setServerConnected(true);
@@ -40,6 +52,7 @@ export function DesktopExperience() {
           setRemoteConnected(connected);
           if (!connected) inputRef.current.tracked = false;
         } else if (message.type === "input") {
+          if (modeRef.current !== "remote") return;
           inputRef.current = {
             tracked: true,
             x: message.x,
@@ -69,14 +82,34 @@ export function DesktopExperience() {
     };
   }, []);
 
+  const handleGameState = useCallback((nextState) => {
+    setGameState(nextState);
+    sendJson(socketRef.current, { type: "game-state", ...nextState });
+  }, []);
+
   const digits = (room || "------").split("");
+
+  function selectInputMode(mode) {
+    modeRef.current = mode;
+    setInputMode(mode);
+    inputRef.current.tracked = false;
+  }
 
   return (
     <main className="desktop-experience">
-      <AsciiField inputRef={inputRef} />
+      <AsciiField inputRef={inputRef} onGameStateChange={handleGameState} />
+      {inputMode === "camera" && <CameraInput inputRef={inputRef} />}
+
+      <section className="game-hud" aria-live="polite">
+        <span>SCORE {String(gameState.score).padStart(5, "0")}</span>
+        <strong className={`game-status game-status--${gameState.status.toLowerCase().replaceAll(" ", "-")}`}>
+          {gameState.status}
+        </strong>
+        <span>LVL {String(gameState.level).padStart(2, "0")}</span>
+      </section>
 
       <section
-        className={`desktop-pairing ${remoteConnected ? "is-connected" : ""}`}
+        className={`desktop-pairing ${remoteConnected ? "is-connected" : ""} ${inputMode === "camera" ? "is-hidden" : ""}`}
         aria-live="polite"
       >
         <div className="desktop-pairing__status">
@@ -95,6 +128,23 @@ export function DesktopExperience() {
           ))}
         </div>
       </section>
+
+      <div className="input-mode" role="group" aria-label="Input mode">
+        <button
+          type="button"
+          className={inputMode === "remote" ? "is-active" : ""}
+          onClick={() => selectInputMode("remote")}
+        >
+          REMOTE
+        </button>
+        <button
+          type="button"
+          className={inputMode === "camera" ? "is-active" : ""}
+          onClick={() => selectInputMode("camera")}
+        >
+          CAMERA
+        </button>
+      </div>
     </main>
   );
 }

@@ -142,7 +142,12 @@ function detach(client) {
 function createRoom(client) {
   detach(client);
   const code = createRoomCode();
-  rooms.set(code, { code, display: client, remote: null });
+  rooms.set(code, {
+    code,
+    display: client,
+    remote: null,
+    gameState: null,
+  });
   client.roomCode = code;
   client.role = "display";
   send(client, { type: "room-created", room: code });
@@ -172,6 +177,7 @@ function joinRoom(client, code) {
   client.role = "remote";
   send(client, { type: "room-joined", room: code });
   reportRoom(room);
+  if (room.gameState) send(client, room.gameState);
 }
 
 function forwardInput(client, message) {
@@ -189,6 +195,22 @@ function forwardInput(client, message) {
     openness: clamp(message.openness, 0, 1),
     motionIntensity: clamp(message.motionIntensity, 0, 20),
   });
+}
+
+function forwardGameState(client, message) {
+  if (client.role !== "display" || !client.roomCode) return;
+  const room = rooms.get(client.roomCode);
+  if (room?.display !== client) return;
+
+  room.gameState = {
+    type: "game-state",
+    score: Math.max(0, Math.floor(Number(message.score) || 0)),
+    misses: Math.max(0, Math.floor(Number(message.misses) || 0)),
+    level: Math.max(1, Math.floor(Number(message.level) || 1)),
+    activeBugs: Math.max(0, Math.floor(Number(message.activeBugs) || 0)),
+    status: String(message.status || "WAITING").slice(0, 24),
+  };
+  send(room.remote, room.gameState);
 }
 
 webSocketServer.on("connection", (client) => {
@@ -212,6 +234,8 @@ webSocketServer.on("connection", (client) => {
       joinRoom(client, String(message.room || ""));
     } else if (message.type === "input") {
       forwardInput(client, message);
+    } else if (message.type === "game-state") {
+      forwardGameState(client, message);
     }
   });
 
