@@ -5,8 +5,11 @@ export const MAX_MISSES = 5;
 const CURVE_STRENGTH = 2;
 const MAX_BUG_LIFETIME = 5_000;
 const MIN_BUG_LIFETIME = 3_000;
-const MAX_SPAWN_INTERVAL = 3_200;
-const MIN_SPAWN_INTERVAL = 1_300;
+const MAX_SPAWN_INTERVAL = 2_800;
+const MIN_SPAWN_INTERVAL = 650;
+const MAX_BURST_CHANCE = 0.48;
+const MIN_SPAWN_JITTER = 0.8;
+const MAX_SPAWN_JITTER = 1.12;
 
 function interpolate(start, end, progress) {
   return start + (end - start) * progress;
@@ -27,7 +30,7 @@ export const LEVEL_PROFILES = Array.from({ length: MAX_LEVEL }, (_, index) => {
   const difficulty = exponentialProgress(level);
   const spawnInterval = roundTo(
     interpolate(MAX_SPAWN_INTERVAL, MIN_SPAWN_INTERVAL, difficulty),
-    100,
+    50,
   );
 
   return Object.freeze({
@@ -37,15 +40,36 @@ export const LEVEL_PROFILES = Array.from({ length: MAX_LEVEL }, (_, index) => {
       100,
     ),
     spawnInterval,
-    maxConcurrent: Math.min(4, 1 + Math.ceil(index / 3)),
+    maxConcurrent: Math.min(6, 1 + Math.ceil(index / 2)),
+    burstChance: roundTo(difficulty * MAX_BURST_CHANCE, 0.01),
     missPenalty: 100 + index * 20,
     captureReward: 100 + index * 20,
-    successDelay: roundTo(Math.max(550, spawnInterval * 0.4), 50),
-    missRecoveryDelay: roundTo(Math.max(400, spawnInterval * 0.24), 50),
+    successDelay: roundTo(Math.max(320, spawnInterval * 0.32), 50),
+    missRecoveryDelay: roundTo(Math.max(250, spawnInterval * 0.2), 50),
   });
 });
 
 export function getLevelProfile(level) {
   const safeLevel = Math.max(1, Math.min(MAX_LEVEL, Math.floor(level) || 1));
   return LEVEL_PROFILES[safeLevel - 1];
+}
+
+export function getSpawnDelay(profile, randomValue = Math.random()) {
+  const normalizedRandom = Math.max(0, Math.min(1, randomValue));
+  const jitter = interpolate(
+    MIN_SPAWN_JITTER,
+    MAX_SPAWN_JITTER,
+    normalizedRandom,
+  );
+  return roundTo(profile.spawnInterval * jitter, 50);
+}
+
+export function getSpawnBatchSize(
+  profile,
+  availableSlots,
+  randomValue = Math.random(),
+) {
+  if (availableSlots <= 0) return 0;
+  const burst = randomValue < profile.burstChance ? 2 : 1;
+  return Math.min(availableSlots, burst);
 }

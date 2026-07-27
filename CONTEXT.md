@@ -53,9 +53,11 @@ openness. A closed fist grabs; an open hand releases.
 - Thrown characters use velocity-based physics and fade out as particles.
 - Score, misses, level, active bugs, and game status are tracked.
 - The run has ten levels driven by an exponential difficulty curve. Bug
-  lifetime drops from 5.0 to 3.0 seconds and spawn intervals from 3.2 to 1.3
-  seconds, while simultaneous bug capacity grows from one to four. The first
-  bug arrives after 0.9 seconds.
+  lifetime drops from 5.0 to 3.0 seconds and base spawn intervals from 2.8 to
+  0.65 seconds, while simultaneous bug capacity grows from one to six. Spawn
+  timing is jittered to avoid a predictable rhythm, and progressive double
+  spawns reach a 48% chance at level ten. The first bug arrives after 0.9
+  seconds.
 - A level requires three consecutive bug fixes. Missing a bug resets level
   progress and deducts `100 + 20 * (level - 1)` points.
 - Captures become more valuable at higher levels, and fast captures receive a

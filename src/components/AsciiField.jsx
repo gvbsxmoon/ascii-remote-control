@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import {
   FIXES_PER_LEVEL,
   getLevelProfile,
+  getSpawnBatchSize,
+  getSpawnDelay,
   MAX_LEVEL,
   MAX_MISSES,
 } from "../lib/gameDifficulty";
@@ -23,7 +25,7 @@ const INPUT_TIMEOUT = 600;
 const PARTICLE_LIFETIME = 1_100;
 const MAX_THROW_SPEED = 1_800;
 const FIRST_BUG_DELAY = 900;
-const LEVEL_TRANSITION_DELAY = 1_800;
+const LEVEL_TRANSITION_DELAY = 1_200;
 const BUG_COLORS = ["#ff2d2d", "#ff665c"];
 const GRAB_COLOR = "#a855f7";
 const GRAB_COLORS = ["#a855f7", "#c084fc"];
@@ -342,7 +344,7 @@ export function AsciiField({
     }
 
     function spawnBug(time) {
-      if (gameOver || gameWon) return;
+      if (gameOver || gameWon) return false;
 
       const profile = getLevelProfile(level);
       const widthInCells = 5 + Math.floor(Math.random() * 4);
@@ -368,7 +370,7 @@ export function AsciiField({
           Math.abs(cell.x - x) <= halfWidth &&
           Math.abs(cell.y - y) <= halfHeight,
       );
-      if (bugCells.length === 0) return;
+      if (bugCells.length === 0) return false;
 
       const id = ++bugSequence;
       bugCells.forEach((cell) => {
@@ -397,6 +399,7 @@ export function AsciiField({
       status = "BUG DETECTED";
       statusUntil = 0;
       wallDirty = true;
+      return true;
     }
 
     function publishGameState() {
@@ -540,10 +543,14 @@ export function AsciiField({
       const activeBugCount = bugs.length + (heldBug ? 1 : 0);
       if (time >= nextBugAt) {
         if (activeBugCount < profile.maxConcurrent) {
-          spawnBug(time);
-          nextBugAt = time + profile.spawnInterval;
+          const availableSlots = profile.maxConcurrent - activeBugCount;
+          const batchSize = getSpawnBatchSize(profile, availableSlots);
+          for (let index = 0; index < batchSize; index += 1) {
+            spawnBug(time);
+          }
+          nextBugAt = time + getSpawnDelay(profile);
         } else {
-          nextBugAt = time + 300;
+          nextBugAt = time + 200;
         }
       }
 
