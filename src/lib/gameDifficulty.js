@@ -1,10 +1,10 @@
 export const MAX_LEVEL = 10;
-export const FIXES_PER_LEVEL = 5;
+export const FIXES_PER_LEVEL = 3;
 export const MAX_MISSES = 5;
 
 const CURVE_STRENGTH = 2;
-const MAX_BUG_LIFETIME = 5_800;
-const MIN_BUG_LIFETIME = 3_800;
+const MAX_BUG_LIFETIME = 5_000;
+const MIN_BUG_LIFETIME = 3_000;
 const MAX_SPAWN_INTERVAL = 3_200;
 const MIN_SPAWN_INTERVAL = 1_300;
 

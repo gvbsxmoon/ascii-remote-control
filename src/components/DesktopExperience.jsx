@@ -37,7 +37,7 @@ export function DesktopExperience() {
     level: 1,
     maxLevel: 10,
     levelProgress: 0,
-    levelTarget: 5,
+    levelTarget: 3,
     maxMisses: 5,
     activeBugs: 0,
     status: "WAITING",
@@ -217,10 +217,10 @@ export function DesktopExperience() {
             <strong id="intro-title">REMOVE THE BUGS</strong>
             <p>
               {inputMode === "camera"
-                ? "MOVE YOUR HAND TO AIM. CLOSE YOUR FIST TO GRAB. OPEN TO THROW."
+                ? "MOVE YOUR HAND TO AIM. CLOSE TO GRAB. MOVE, THEN OPEN TO THROW."
                 : remoteConnected
-                  ? "TILT TO AIM. HOLD TO GRAB. RELEASE TO THROW."
-                  : "PAIR A REMOTE OR USE THE MOUSE. HOLD TO GRAB. RELEASE TO THROW."}
+                  ? "TILT TO AIM. HOLD TO GRAB. MOVE, THEN RELEASE TO THROW."
+                  : "PAIR A REMOTE OR USE THE MOUSE. GRAB, DRAG, THEN RELEASE."}
             </p>
             <button
               ref={introButtonRef}

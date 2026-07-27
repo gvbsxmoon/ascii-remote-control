@@ -29,7 +29,7 @@ export function MobileRemote() {
     level: 1,
     maxLevel: 10,
     levelProgress: 0,
-    levelTarget: 5,
+    levelTarget: 3,
     maxMisses: 5,
     activeBugs: 0,
     status: "WAITING",

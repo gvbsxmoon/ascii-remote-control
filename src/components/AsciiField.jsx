@@ -5,6 +5,12 @@ import {
   MAX_LEVEL,
   MAX_MISSES,
 } from "../lib/gameDifficulty";
+import {
+  getProximityStrength,
+  hasExtractedBug,
+  isBugInGrabRange,
+  PROXIMITY_DISTANCE,
+} from "../lib/gameInteraction";
 
 const CHARACTERS = "@%#*+=-:.?01/\\|{}[]()<>$&;";
 const CELL_WIDTH = 9;
@@ -16,7 +22,6 @@ const OPEN_THRESHOLD = 0.58;
 const INPUT_TIMEOUT = 600;
 const PARTICLE_LIFETIME = 1_100;
 const MAX_THROW_SPEED = 1_800;
-const PROXIMITY_DISTANCE = 180;
 const FIRST_BUG_DELAY = 900;
 const LEVEL_TRANSITION_DELAY = 1_800;
 const BUG_COLORS = ["#ff2d2d", "#ff665c"];
@@ -202,10 +207,14 @@ export function AsciiField({
       wallDirty = true;
     }
 
-    function grabBug(bug, time) {
+    function grabBug(bug) {
       if (!bug) return;
       bugs = bugs.filter((candidate) => candidate.id !== bug.id);
-      heldBug = bug;
+      heldBug = {
+        ...bug,
+        grabbedAtX: cursor.x,
+        grabbedAtY: cursor.y,
+      };
       heldCharacters = bug.cells.map((cell, index) => {
         const captured = {
           character: cell.character,
@@ -216,8 +225,7 @@ export function AsciiField({
           y: cell.y,
         };
         cell.bugId = null;
-        cell.character = randomCharacter();
-        cell.nextChange = time + 250 + Math.random() * 1_200;
+        cell.hidden = true;
         return captured;
       });
       cursor.throwVelocityX = cursor.velocityX;
@@ -228,8 +236,46 @@ export function AsciiField({
       wallDirty = true;
     }
 
+    function restoreHeldBug(time) {
+      if (!heldBug) return;
+
+      heldBug.cells.forEach((cell, index) => {
+        cell.hidden = false;
+        cell.bugId = heldBug.id;
+        cell.character = heldCharacters[index]?.character || randomCharacter();
+        cell.flashUntil = 0;
+        cell.nextChange = time + 250 + Math.random() * 1_200;
+      });
+      bugs.push(heldBug);
+      heldBug = null;
+      heldCharacters = [];
+      status = "BUG DETECTED";
+      statusUntil = 0;
+      wallDirty = true;
+    }
+
     function releaseCharacters(time) {
       if (heldCharacters.length === 0) return;
+
+      const extracted =
+        heldBug &&
+        hasExtractedBug(
+          heldBug.grabbedAtX,
+          heldBug.grabbedAtY,
+          cursor.x,
+          cursor.y,
+        );
+      if (!extracted) {
+        restoreHeldBug(time);
+        return;
+      }
+
+      heldBug.cells.forEach((cell) => {
+        cell.hidden = false;
+        cell.bugId = null;
+        cell.character = randomCharacter();
+        cell.nextChange = time + 250 + Math.random() * 1_200;
+      });
 
       const rawThrowSpeed = Math.hypot(
         cursor.throwVelocityX,
@@ -376,8 +422,10 @@ export function AsciiField({
     }
 
     function clearActiveBugs(time) {
-      bugs.forEach((bug) => {
+      const activeBugs = heldBug ? [...bugs, heldBug] : bugs;
+      activeBugs.forEach((bug) => {
         bug.cells.forEach((cell) => {
+          cell.hidden = false;
           cell.bugId = null;
           cell.character = randomCharacter();
           cell.nextChange = time + 250 + Math.random() * 1_200;
@@ -597,23 +645,41 @@ export function AsciiField({
       });
     }
 
-    function drawBugs(time) {
+    function drawBugs(time, tracked = false) {
       configureText(context);
       bugs.forEach((bug) => {
         const remaining = Math.max(0, (bug.expiresAt - time) / bug.lifetime);
         const urgency = 1 - remaining;
+        const distance = Math.hypot(cursor.x - bug.x, cursor.y - bug.y);
+        const proximity = tracked ? getProximityStrength(distance) : 0;
+        const shake = proximity * proximity * 4.5;
+        const shakeX =
+          Math.sin(time * 0.047 + bug.id * 2.3) * shake;
+        const shakeY =
+          Math.cos(time * 0.053 + bug.id * 1.7) * shake;
         const pulse =
           0.9 +
-          Math.sin(time * (0.006 + urgency * 0.012) + bug.id) * 0.1;
+          Math.sin(
+            time * (0.006 + urgency * 0.012 + proximity * 0.012) + bug.id,
+          ) *
+            (0.1 + proximity * 0.08);
 
         bug.cells.forEach((cell, index) => {
           context.save();
           context.globalAlpha = pulse;
           context.fillStyle = BUG_COLORS[index % BUG_COLORS.length];
           context.shadowColor = context.fillStyle;
-          context.shadowBlur = 12 + urgency * 10;
-          context.fillText(cell.character, cell.x, cell.y);
-          context.fillText(cell.character, cell.x, cell.y);
+          context.shadowBlur = 12 + urgency * 10 + proximity * 8;
+          context.fillText(
+            cell.character,
+            cell.x + shakeX,
+            cell.y + shakeY,
+          );
+          context.fillText(
+            cell.character,
+            cell.x + shakeX,
+            cell.y + shakeY,
+          );
           context.restore();
         });
       });
@@ -655,13 +721,13 @@ export function AsciiField({
         return;
       }
 
-      const strength = 1 - nearest.distance / PROXIMITY_DISTANCE;
+      const strength = getProximityStrength(nearest.distance);
       const deltaX = nearest.bug.x - cursor.x;
       const deltaY = nearest.bug.y - cursor.y;
       const length = Math.max(1, Math.hypot(deltaX, deltaY));
       const normalX = -deltaY / length;
       const normalY = deltaX / length;
-      const segments = 14;
+      const segments = 18;
       context.save();
       context.strokeStyle = `rgba(255, 45, 45, ${0.58 + strength * 0.4})`;
       context.lineWidth = 1.2 + strength * 1.5;
@@ -674,7 +740,7 @@ export function AsciiField({
         const vibration =
           (Math.sin(time * 0.024 + index * 1.65) +
             Math.sin(time * 0.011 - index * 0.9) * 0.55) *
-          (1.5 + strength * 2.8) *
+          (1.2 + strength * strength * 8) *
           envelope;
         const x = cursor.x + deltaX * progress + normalX * vibration;
         const y = cursor.y + deltaY * progress + normalY * vibration;
@@ -695,9 +761,11 @@ export function AsciiField({
       context.restore();
     }
 
-    function drawCursor(tracked, time) {
+    function drawCursor(tracked, time, proximity = 0) {
       if (!tracked) return;
       const grabbed = heldCharacters.length > 0;
+      const radiusVibration =
+        Math.sin(time * 0.05) * proximity * proximity * 1.8;
       context.save();
       context.fillStyle = `rgba(0, 0, 0, ${cursor.fillOpacity})`;
       context.strokeStyle = grabbed
@@ -707,7 +775,13 @@ export function AsciiField({
       context.shadowColor = grabbed ? GRAB_COLOR : "transparent";
       context.shadowBlur = grabbed ? 8 : 0;
       context.beginPath();
-      context.arc(cursor.x, cursor.y, cursor.radius, 0, Math.PI * 2);
+      context.arc(
+        cursor.x,
+        cursor.y,
+        cursor.radius + radiusVibration,
+        0,
+        Math.PI * 2,
+      );
       context.fill();
       context.stroke();
 
@@ -718,7 +792,13 @@ export function AsciiField({
         context.setLineDash([3, 5]);
         context.lineDashOffset = -time * 0.035;
         context.beginPath();
-        context.arc(cursor.x, cursor.y, cursor.radius + 6, 0, Math.PI * 2);
+        context.arc(
+          cursor.x,
+          cursor.y,
+          cursor.radius + 6 + radiusVibration,
+          0,
+          Math.PI * 2,
+        );
         context.stroke();
       }
       context.restore();
@@ -931,6 +1011,10 @@ export function AsciiField({
       }
       const nearest = findNearestBug();
       const hoveredBug = findHoveredBug();
+      const proximity =
+        tracked && nearest.bug
+          ? getProximityStrength(nearest.distance)
+          : 0;
       updateCursorAppearance(delta, Boolean(hoveredBug));
 
       if (
@@ -939,9 +1023,9 @@ export function AsciiField({
         handClosed &&
         !wasClosed &&
         nearest.bug &&
-        nearest.distance <= PROXIMITY_DISTANCE
+        isBugInGrabRange(nearest.distance)
       ) {
-        grabBug(nearest.bug, time);
+        grabBug(nearest.bug);
       } else if (!gameOver && !gameWon && !handClosed && wasClosed) {
         releaseCharacters(time);
       }
@@ -954,10 +1038,10 @@ export function AsciiField({
       context.fillStyle = "#000000";
       context.fillRect(0, 0, size.width, size.height);
       context.drawImage(wallCanvas, 0, 0, size.width, size.height);
-      drawBugs(time);
+      drawBugs(time, tracked);
       drawProximityLink(nearest, hoveredBug, tracked, time);
       drawParticles(time);
-      drawCursor(tracked, time);
+      drawCursor(tracked, time, proximity);
       drawHeld();
       frameId = requestAnimationFrame(render);
     }

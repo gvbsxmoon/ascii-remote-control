@@ -222,7 +222,7 @@ function forwardGameState(client, message) {
       0,
       Math.floor(Number(message.levelProgress) || 0),
     ),
-    levelTarget: Math.max(1, Math.floor(Number(message.levelTarget) || 5)),
+    levelTarget: Math.max(1, Math.floor(Number(message.levelTarget) || 3)),
     maxMisses: Math.max(1, Math.floor(Number(message.maxMisses) || 5)),
     activeBugs: Math.max(0, Math.floor(Number(message.activeBugs) || 0)),
     status: String(message.status || "WAITING").slice(0, 24),

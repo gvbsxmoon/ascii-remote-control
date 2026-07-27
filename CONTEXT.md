@@ -38,8 +38,12 @@ openness. A closed fist grabs; an open hand releases.
 - 9px Share Tech Mono characters at low white opacity.
 - Sparse random neon-green character flashes.
 - 32px black cursor with a thin white border.
-- Bright red bug blocks with a level-dependent 3.8-to-5.8-second lifetime.
-- A glowing red line oscillates between the cursor and a bug within grab range.
+- Bright red bug blocks with a level-dependent three-to-five-second lifetime.
+- A glowing red line appears within 145px of a bug and oscillates more strongly
+  as the cursor approaches. The bug and cursor radius also shake with proximity.
+- Grabbing is stricter than proximity: the cursor must be within 96px. A
+  captured bug must then move at least 64px before release to count; releasing
+  early restores it to its original cells without awarding points.
 - The cursor grows from a 32px to a 48px radius only while directly over a bug,
   and becomes translucent so the bug remains visible beneath it.
 - A grabbed bug changes the cursor to a glowing purple lock state with a
@@ -49,14 +53,14 @@ openness. A closed fist grabs; an open hand releases.
 - Thrown characters use velocity-based physics and fade out as particles.
 - Score, misses, level, active bugs, and game status are tracked.
 - The run has ten levels driven by an exponential difficulty curve. Bug
-  lifetime drops from 5.8 to 3.8 seconds and spawn intervals from 3.2 to 1.3
+  lifetime drops from 5.0 to 3.0 seconds and spawn intervals from 3.2 to 1.3
   seconds, while simultaneous bug capacity grows from one to four. The first
   bug arrives after 0.9 seconds.
-- A level requires five consecutive bug fixes. Missing a bug resets level
+- A level requires three consecutive bug fixes. Missing a bug resets level
   progress and deducts `100 + 20 * (level - 1)` points.
 - Captures become more valuable at higher levels, and fast captures receive a
   proportional time bonus.
-- Clearing five bugs at level ten completes the run with `SYSTEM CLEAN`.
+- Clearing three bugs at level ten completes the run with `SYSTEM CLEAN`.
 - Five missed bugs trigger game over with a random hostile message. Mouse
   click, remote touch, or closing the tracked hand restarts the game.
 - Status values include `WAITING`, `HEALTHY`, `BUG DETECTED`,
@@ -136,6 +140,8 @@ Server messages include `room-created`, `room-joined`, `room-not-found`,
   and openness estimation.
 - `src/lib/gameDifficulty.js`: immutable level profiles and the exponential
   difficulty curve.
+- `src/lib/gameInteraction.js`: proximity, grab, and minimum extraction
+  thresholds shared with focused unit tests.
 - `src/lib/remoteMotion.js`: phone tilt mapping, dead zone, and speed-limited
   smoothing.
 - `src/lib/realtime.js`: same-origin WebSocket URL and JSON send helper.

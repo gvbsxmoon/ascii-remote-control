@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  FIXES_PER_LEVEL,
   getLevelProfile,
   LEVEL_PROFILES,
   MAX_LEVEL,
@@ -9,13 +10,14 @@ import {
 test("difficulty curve has ten bounded, increasingly difficult levels", () => {
   assert.equal(LEVEL_PROFILES.length, 10);
   assert.equal(MAX_LEVEL, 10);
+  assert.equal(FIXES_PER_LEVEL, 3);
   assert.deepEqual(
     {
       lifetime: getLevelProfile(1).bugLifetime,
       spawn: getLevelProfile(1).spawnInterval,
       penalty: getLevelProfile(1).missPenalty,
     },
-    { lifetime: 5_800, spawn: 3_200, penalty: 100 },
+    { lifetime: 5_000, spawn: 3_200, penalty: 100 },
   );
   assert.deepEqual(
     {
@@ -23,7 +25,7 @@ test("difficulty curve has ten bounded, increasingly difficult levels", () => {
       spawn: getLevelProfile(10).spawnInterval,
       penalty: getLevelProfile(10).missPenalty,
     },
-    { lifetime: 3_800, spawn: 1_300, penalty: 280 },
+    { lifetime: 3_000, spawn: 1_300, penalty: 280 },
   );
 
   LEVEL_PROFILES.slice(1).forEach((profile, index) => {
