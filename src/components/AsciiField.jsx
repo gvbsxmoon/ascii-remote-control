@@ -20,6 +20,7 @@ const PROXIMITY_DISTANCE = 180;
 const FIRST_BUG_DELAY = 1_200;
 const LEVEL_TRANSITION_DELAY = 1_800;
 const BUG_COLORS = ["#ff2d2d", "#ff665c"];
+const GRAB_COLOR = "#a855f7";
 const GAME_WON_MESSAGE = "TEN LEVELS. PRODUCTION SURVIVED.";
 const GAME_OVER_MESSAGES = [
   "YOU SHOULDN'T BE WORKING HERE.",
@@ -672,10 +673,10 @@ export function AsciiField({
       context.save();
       context.fillStyle = `rgba(0, 0, 0, ${cursor.fillOpacity})`;
       context.strokeStyle = grabbed
-        ? "#ff2d2d"
+        ? GRAB_COLOR
         : "rgba(255, 255, 255, 0.92)";
       context.lineWidth = grabbed ? 1.5 : 0.75;
-      context.shadowColor = grabbed ? "#ff2d2d" : "transparent";
+      context.shadowColor = grabbed ? GRAB_COLOR : "transparent";
       context.shadowBlur = grabbed ? 8 : 0;
       context.beginPath();
       context.arc(cursor.x, cursor.y, cursor.radius, 0, Math.PI * 2);

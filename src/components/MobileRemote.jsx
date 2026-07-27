@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getWebSocketUrl, sendJson } from "../lib/realtime";
+import { smoothMotionAxis, tiltToTarget } from "../lib/remoteMotion";
 
 const clamp = (value, minimum, maximum) =>
   Math.max(minimum, Math.min(maximum, value));
@@ -49,6 +50,7 @@ export function MobileRemote() {
     x: 0.5,
     y: 0.5,
     motionIntensity: 0,
+    lastOrientationAt: null,
   });
 
   const room = digits.join("");
@@ -155,8 +157,14 @@ export function MobileRemote() {
         vertical = screenAngle === 90 ? -previousHorizontal : previousHorizontal;
       }
 
-      sensor.x = clamp(0.5 + horizontal / 60, 0, 1);
-      sensor.y = clamp(0.5 + vertical / 70, 0, 1);
+      const now = performance.now();
+      const elapsed = sensor.lastOrientationAt
+        ? now - sensor.lastOrientationAt
+        : 1_000 / 60;
+      const target = tiltToTarget(horizontal, vertical);
+      sensor.lastOrientationAt = now;
+      sensor.x = smoothMotionAxis(sensor.x, target.x, elapsed);
+      sensor.y = smoothMotionAxis(sensor.y, target.y, elapsed);
     }
 
     function onMotion(event) {
@@ -232,6 +240,7 @@ export function MobileRemote() {
         sensorRef.current.active = true;
         sensorRef.current.neutralBeta = null;
         sensorRef.current.neutralGamma = null;
+        sensorRef.current.lastOrientationAt = null;
         setMotionState("granted");
         navigator.wakeLock?.request("screen").catch(() => {});
         return true;

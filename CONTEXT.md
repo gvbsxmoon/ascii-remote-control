@@ -42,8 +42,9 @@ openness. A closed fist grabs; an open hand releases.
 - A glowing red line oscillates between the cursor and a bug within grab range.
 - The cursor grows from a 32px to a 48px radius only while directly over a bug,
   and becomes translucent so the bug remains visible beneath it.
-- A grabbed bug changes the cursor to a glowing red lock state with a rotating
-  dashed ring.
+- A grabbed bug changes the cursor to a glowing purple lock state with a
+  rotating dashed ring. Grab states use purple on both display and remote; bugs
+  and errors remain red, while healthy/online states remain green.
 - Thrown characters use velocity-based physics and fade out as particles.
 - Score, misses, level, active bugs, and game status are tracked.
 - The run has ten levels driven by an exponential difficulty curve. Bug
@@ -126,6 +127,8 @@ Server messages include `room-created`, `room-joined`, `room-not-found`,
   and openness estimation.
 - `src/lib/gameDifficulty.js`: immutable level profiles and the exponential
   difficulty curve.
+- `src/lib/remoteMotion.js`: phone tilt mapping, dead zone, and speed-limited
+  smoothing.
 - `src/lib/realtime.js`: same-origin WebSocket URL and JSON send helper.
 - `src/index.css`: all desktop and mobile styling.
 - `render.yaml`: Render Blueprint for the Node web service.
@@ -134,7 +137,8 @@ Server messages include `room-created`, `room-joined`, `room-not-found`,
 
 Phone input uses `deviceorientation` for normalized cursor coordinates and
 `devicemotion` for throw intensity. Touch hold sends `openness: 0`; release
-sends `openness: 1`.
+sends `openness: 1`. Orientation uses a center dead zone, reduced sensitivity,
+time-based smoothing, and a maximum normalized speed to prevent sudden jumps.
 
 On iOS, motion permission must be requested from a user gesture. The app asks
 when the sixth code digit is entered and retries on the first hold. Motion APIs

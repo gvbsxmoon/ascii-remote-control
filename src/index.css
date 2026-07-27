@@ -79,7 +79,8 @@ input {
 
 .game-hud .game-status--bug-captured,
 .remote-game-status--bug-captured {
-  color: #ff3b30;
+  color: #a855f7;
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.72);
 }
 
 .system-modal {
@@ -377,7 +378,14 @@ input {
 }
 
 .code-entry--invalid .remote-status {
-  color: #39ff14;
+  color: #ff3b30;
+}
+
+.code-entry--invalid .code-inputs input,
+.code-entry--invalid .code-inputs input:focus {
+  border-color: rgba(255, 59, 48, 0.72);
+  caret-color: #ff3b30;
+  box-shadow: inset 0 -2px #ff3b30;
 }
 
 .code-inputs {
@@ -475,9 +483,11 @@ input {
 }
 
 .mobile-remote.is-pressed .remote-pad {
-  border-color: #39ff14;
-  color: #39ff14;
-  box-shadow: inset 0 0 42px rgba(57, 255, 20, 0.08);
+  border-color: #a855f7;
+  color: #a855f7;
+  box-shadow:
+    inset 0 0 42px rgba(168, 85, 247, 0.1),
+    0 0 16px rgba(168, 85, 247, 0.2);
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
