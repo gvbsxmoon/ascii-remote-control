@@ -64,7 +64,8 @@ openness. A closed fist grabs; an open hand releases.
   visually minimal and do not restore the old overlapping center dot.
 - Mobile browsers automatically show the remote UI.
 - Desktop input mode is a segmented `REMOTE` / `CAMERA` control, with remote as
-  the default.
+  the default. It can only be changed while the intro modal is open and locks
+  for the entire run when the game starts.
 - An intro modal pauses the game until mouse click, paired remote touch, or a
   camera-tracked fist closes over its start button.
 - Switching to camera closes and invalidates the pairing room. Switching back

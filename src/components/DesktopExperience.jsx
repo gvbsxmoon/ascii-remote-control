@@ -243,6 +243,7 @@ export function DesktopExperience() {
         <button
           type="button"
           className={inputMode === "remote" ? "is-active" : ""}
+          disabled={!introOpen}
           onClick={() => selectInputMode("remote")}
         >
           REMOTE
@@ -250,6 +251,7 @@ export function DesktopExperience() {
         <button
           type="button"
           className={inputMode === "camera" ? "is-active" : ""}
+          disabled={!introOpen}
           onClick={() => selectInputMode("camera")}
         >
           CAMERA
