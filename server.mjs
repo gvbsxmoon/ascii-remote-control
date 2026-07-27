@@ -197,6 +197,13 @@ function forwardInput(client, message) {
   });
 }
 
+function forwardRestart(client) {
+  if (client.role !== "remote" || !client.roomCode) return;
+  const room = rooms.get(client.roomCode);
+  if (room?.remote !== client) return;
+  send(room.display, { type: "restart-session" });
+}
+
 function forwardGameState(client, message) {
   if (client.role !== "display" || !client.roomCode) return;
   const room = rooms.get(client.roomCode);
@@ -250,6 +257,8 @@ webSocketServer.on("connection", (client) => {
       joinRoom(client, String(message.room || ""));
     } else if (message.type === "input") {
       forwardInput(client, message);
+    } else if (message.type === "restart-session") {
+      forwardRestart(client);
     } else if (message.type === "game-state") {
       forwardGameState(client, message);
     }

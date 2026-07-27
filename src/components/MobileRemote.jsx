@@ -307,6 +307,14 @@ export function MobileRemote() {
     if (next.every(Boolean)) void enableSensors();
   }
 
+  function restartSession() {
+    holdRef.current = false;
+    setPressed(false);
+    sendInput(1);
+    sendJson(socketRef.current, { type: "restart-session" });
+    navigator.vibrate?.([12, 40, 12]);
+  }
+
   const paired = ["ready", "waiting", "offline"].includes(phase);
 
   return (
@@ -348,7 +356,6 @@ export function MobileRemote() {
             >
               {gameState.status}
             </strong>
-            <i className={phase === "ready" ? "is-online" : ""} />
           </header>
           <button
             className="remote-pad"
@@ -373,8 +380,11 @@ export function MobileRemote() {
             </span>
           </button>
           <footer className="remote-footer">
-            <span>{room}</span>
-            <span>
+            <span className="remote-footer__pairing">
+              <i className={phase === "ready" ? "is-online" : ""} />
+              {room}
+            </span>
+            <span className="remote-footer__state">
               {motionState === "denied"
                 ? "MOTION DENIED"
                 : motionState === "requesting"
@@ -385,6 +395,14 @@ export function MobileRemote() {
                     ? `LVL ${String(gameState.level).padStart(2, "0")}/${String(gameState.maxLevel).padStart(2, "0")} ${gameState.levelProgress}/${gameState.levelTarget}`
                     : "RECONNECTING"}
             </span>
+            <button
+              type="button"
+              className="remote-restart"
+              disabled={phase !== "ready"}
+              onClick={restartSession}
+            >
+              RESTART SESSION
+            </button>
           </footer>
         </>
       )}

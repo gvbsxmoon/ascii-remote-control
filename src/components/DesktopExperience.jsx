@@ -28,7 +28,9 @@ export function DesktopExperience() {
   const [introOpen, setIntroOpen] = useState(true);
   const [room, setRoom] = useState("");
   const [remoteConnected, setRemoteConnected] = useState(false);
+  const [remoteWasConnected, setRemoteWasConnected] = useState(false);
   const [serverConnected, setServerConnected] = useState(false);
+  const [restartSignal, setRestartSignal] = useState(0);
   const [gameState, setGameState] = useState({
     score: 0,
     misses: 0,
@@ -79,6 +81,9 @@ export function DesktopExperience() {
         } else if (message.type === "peer-status") {
           const connected = Boolean(message.remoteConnected);
           setRemoteConnected(connected);
+          if (connected) {
+            setRemoteWasConnected(true);
+          }
           if (!connected) inputRef.current.tracked = false;
         } else if (message.type === "input") {
           if (modeRef.current !== "remote") return;
@@ -91,6 +96,8 @@ export function DesktopExperience() {
             receivedAt: performance.now(),
             source: "remote",
           };
+        } else if (message.type === "restart-session") {
+          setRestartSignal((signal) => signal + 1);
         }
       });
 
@@ -122,12 +129,19 @@ export function DesktopExperience() {
   }, []);
 
   const digits = (room || "------").split("");
+  const remoteSessionPaused =
+    inputMode === "remote" &&
+    remoteWasConnected &&
+    !remoteConnected &&
+    !gameState.gameOver &&
+    !gameState.gameWon;
 
   function selectInputMode(mode) {
     if (mode === modeRef.current) return;
     modeRef.current = mode;
     setInputMode(mode);
     inputRef.current.tracked = false;
+    setRemoteWasConnected(false);
 
     if (mode === "camera") {
       setRoom("");
@@ -143,7 +157,9 @@ export function DesktopExperience() {
       <AsciiField
         inputRef={inputRef}
         onGameStateChange={handleGameState}
-        paused={introOpen}
+        paused={introOpen || remoteSessionPaused}
+        pausedInputEnabled={introOpen}
+        restartSignal={restartSignal}
         interactionTargetRef={introButtonRef}
         cursorOverlayRef={introCursorRef}
         onDismiss={dismissIntro}
@@ -179,6 +195,14 @@ export function DesktopExperience() {
           <strong>SYSTEM CLEAN</strong>
           <p>{gameState.gameWonMessage}</p>
           <span>CLICK, TOUCH OR CLOSE HAND TO RESTART</span>
+        </section>
+      )}
+
+      {remoteSessionPaused && !introOpen && (
+        <section className="system-modal remote-paused" aria-live="assertive">
+          <strong>SESSION PAUSED</strong>
+          <p>REMOTE DISCONNECTED</p>
+          <span>RECONNECT TO CONTINUE</span>
         </section>
       )}
 

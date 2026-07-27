@@ -17,10 +17,11 @@ const INPUT_TIMEOUT = 600;
 const PARTICLE_LIFETIME = 1_100;
 const MAX_THROW_SPEED = 1_800;
 const PROXIMITY_DISTANCE = 180;
-const FIRST_BUG_DELAY = 1_200;
+const FIRST_BUG_DELAY = 900;
 const LEVEL_TRANSITION_DELAY = 1_800;
 const BUG_COLORS = ["#ff2d2d", "#ff665c"];
 const GRAB_COLOR = "#a855f7";
+const GRAB_COLORS = ["#a855f7", "#c084fc"];
 const GAME_WON_MESSAGE = "TEN LEVELS. PRODUCTION SURVIVED.";
 const GAME_OVER_MESSAGES = [
   "YOU SHOULDN'T BE WORKING HERE.",
@@ -63,6 +64,8 @@ export function AsciiField({
   inputRef,
   onGameStateChange,
   paused = false,
+  pausedInputEnabled = false,
+  restartSignal = 0,
   interactionTargetRef,
   cursorOverlayRef,
   onDismiss,
@@ -70,6 +73,8 @@ export function AsciiField({
   const canvasRef = useRef(null);
   const onGameStateChangeRef = useRef(onGameStateChange);
   const pausedRef = useRef(paused);
+  const pausedInputEnabledRef = useRef(pausedInputEnabled);
+  const restartSignalRef = useRef(restartSignal);
   const onDismissRef = useRef(onDismiss);
 
   useEffect(() => {
@@ -79,6 +84,14 @@ export function AsciiField({
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
+
+  useEffect(() => {
+    pausedInputEnabledRef.current = pausedInputEnabled;
+  }, [pausedInputEnabled]);
+
+  useEffect(() => {
+    restartSignalRef.current = restartSignal;
+  }, [restartSignal]);
 
   useEffect(() => {
     onDismissRef.current = onDismiss;
@@ -119,6 +132,8 @@ export function AsciiField({
     let nextWallFrame = 0;
     let frameId;
     let previousTime = performance.now();
+    let pausedAt = null;
+    let handledRestartSignal = restartSignalRef.current;
     let gameStartedAt = 0;
     let nextBugAt = Number.POSITIVE_INFINITY;
     let bugSequence = 0;
@@ -194,7 +209,7 @@ export function AsciiField({
       heldCharacters = bug.cells.map((cell, index) => {
         const captured = {
           character: cell.character,
-          color: BUG_COLORS[index % BUG_COLORS.length],
+          color: GRAB_COLORS[index % GRAB_COLORS.length],
           offsetX: cell.x - bug.x,
           offsetY: cell.y - bug.y,
           x: cell.x,
@@ -410,6 +425,19 @@ export function AsciiField({
       nextBugAt = time + FIRST_BUG_DELAY;
       wallDirty = true;
       publishGameState();
+    }
+
+    function shiftGameClock(duration) {
+      if (gameStartedAt > 0) gameStartedAt += duration;
+      if (Number.isFinite(nextBugAt)) nextBugAt += duration;
+      if (Number.isFinite(statusUntil)) statusUntil += duration;
+      bugs.forEach((bug) => {
+        bug.spawnedAt += duration;
+        bug.expiresAt += duration;
+      });
+      particles.forEach((character) => {
+        character.bornAt += duration;
+      });
     }
 
     function updateGame(time, tracked) {
@@ -792,6 +820,15 @@ export function AsciiField({
     }
 
     function render(time) {
+      const isPaused = pausedRef.current;
+      if (isPaused && pausedAt === null) {
+        pausedAt = time;
+      } else if (!isPaused && pausedAt !== null) {
+        shiftGameClock(time - pausedAt);
+        pausedAt = null;
+        previousTime = time;
+      }
+
       const delta = Math.min((time - previousTime) / 1_000, 0.033);
       previousTime = time;
       const input = inputRef.current;
@@ -800,35 +837,39 @@ export function AsciiField({
         (input.source === "pointer" ||
           time - input.receivedAt < INPUT_TIMEOUT);
 
-      if (tracked) {
-        cursor.targetX = input.x * size.width;
-        cursor.targetY = input.y * size.height;
-        const previousX = cursor.x;
-        const previousY = cursor.y;
-        const follow = Math.min(1, delta * 18);
-        cursor.x += (cursor.targetX - cursor.x) * follow;
-        cursor.y += (cursor.targetY - cursor.y) * follow;
+      if (!isPaused || pausedInputEnabledRef.current) {
+        if (tracked) {
+          cursor.targetX = input.x * size.width;
+          cursor.targetY = input.y * size.height;
+          const previousX = cursor.x;
+          const previousY = cursor.y;
+          const follow = Math.min(1, delta * 18);
+          cursor.x += (cursor.targetX - cursor.x) * follow;
+          cursor.y += (cursor.targetY - cursor.y) * follow;
 
-        const velocityFollow = Math.min(1, delta * 12);
-        const instantVelocityX = (cursor.x - previousX) / Math.max(delta, 0.001);
-        const instantVelocityY = (cursor.y - previousY) / Math.max(delta, 0.001);
-        cursor.velocityX +=
-          (instantVelocityX - cursor.velocityX) * velocityFollow;
-        cursor.velocityY +=
-          (instantVelocityY - cursor.velocityY) * velocityFollow;
+          const velocityFollow = Math.min(1, delta * 12);
+          const instantVelocityX =
+            (cursor.x - previousX) / Math.max(delta, 0.001);
+          const instantVelocityY =
+            (cursor.y - previousY) / Math.max(delta, 0.001);
+          cursor.velocityX +=
+            (instantVelocityX - cursor.velocityX) * velocityFollow;
+          cursor.velocityY +=
+            (instantVelocityY - cursor.velocityY) * velocityFollow;
 
-        if (handClosed && input.openness > OPEN_THRESHOLD) {
+          if (handClosed && input.openness > OPEN_THRESHOLD) {
+            handClosed = false;
+          } else if (!handClosed && input.openness < CLOSED_THRESHOLD) {
+            handClosed = true;
+          }
+        } else {
           handClosed = false;
-        } else if (!handClosed && input.openness < CLOSED_THRESHOLD) {
-          handClosed = true;
+          cursor.velocityX *= Math.exp(-12 * delta);
+          cursor.velocityY *= Math.exp(-12 * delta);
         }
-      } else {
-        handClosed = false;
-        cursor.velocityX *= Math.exp(-12 * delta);
-        cursor.velocityY *= Math.exp(-12 * delta);
       }
 
-      if (handClosed) {
+      if (handClosed && (!isPaused || pausedInputEnabledRef.current)) {
         const throwFollow = Math.min(1, delta * 10);
         cursor.throwVelocityX +=
           (cursor.velocityX - cursor.throwVelocityX) * throwFollow;
@@ -843,7 +884,7 @@ export function AsciiField({
       const interactionHovered = isInteractionTargetHovered(tracked);
       updateCursorOverlay(tracked, input.source, interactionHovered);
 
-      if (pausedRef.current) {
+      if (isPaused) {
         updateCursorAppearance(delta, interactionHovered);
         if (
           handClosed &&
@@ -860,9 +901,22 @@ export function AsciiField({
         context.fillStyle = "#000000";
         context.fillRect(0, 0, size.width, size.height);
         context.drawImage(wallCanvas, 0, 0, size.width, size.height);
+        if (!pausedInputEnabledRef.current) {
+          const frozenTime = pausedAt ?? time;
+          drawBugs(frozenTime);
+          drawParticles(frozenTime);
+          drawHeld();
+        }
         drawCursor(tracked, time);
         frameId = requestAnimationFrame(render);
         return;
+      }
+
+      if (handledRestartSignal !== restartSignalRef.current) {
+        handledRestartSignal = restartSignalRef.current;
+        restartGame(time);
+        handClosed = false;
+        wasClosed = false;
       }
 
       const gameWasEnded = gameOver || gameWon;

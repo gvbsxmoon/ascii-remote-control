@@ -38,18 +38,20 @@ openness. A closed fist grabs; an open hand releases.
 - 9px Share Tech Mono characters at low white opacity.
 - Sparse random neon-green character flashes.
 - 32px black cursor with a thin white border.
-- Bright red bug blocks with a level-dependent four-to-six-second lifetime.
+- Bright red bug blocks with a level-dependent 3.8-to-5.8-second lifetime.
 - A glowing red line oscillates between the cursor and a bug within grab range.
 - The cursor grows from a 32px to a 48px radius only while directly over a bug,
   and becomes translucent so the bug remains visible beneath it.
 - A grabbed bug changes the cursor to a glowing purple lock state with a
-  rotating dashed ring. Grab states use purple on both display and remote; bugs
-  and errors remain red, while healthy/online states remain green.
+  rotating dashed ring. Its captured ASCII and thrown particles also turn
+  purple. Grab states use purple on both display and remote; active bugs and
+  errors remain red, while healthy/online states remain green.
 - Thrown characters use velocity-based physics and fade out as particles.
 - Score, misses, level, active bugs, and game status are tracked.
 - The run has ten levels driven by an exponential difficulty curve. Bug
-  lifetime drops from 6.0 to 4.0 seconds and spawn intervals from 3.6 to 1.5
-  seconds, while simultaneous bug capacity grows from one to four.
+  lifetime drops from 5.8 to 3.8 seconds and spawn intervals from 3.2 to 1.3
+  seconds, while simultaneous bug capacity grows from one to four. The first
+  bug arrives after 0.9 seconds.
 - A level requires five consecutive bug fixes. Missing a bug resets level
   progress and deducts `100 + 20 * (level - 1)` points.
 - Captures become more valuable at higher levels, and fast captures receive a
@@ -61,7 +63,9 @@ openness. A closed fist grabs; an open hand releases.
   `BUG CAPTURED`, `BUG MISSED`, `LEVEL UP`, `GAME OVER`, and `SYSTEM CLEAN`.
 - Game state, level progress, misses, game over, and completion are mirrored on
   the paired phone.
-- The phone UI has a six-cell code input and one large hold surface. Keep it
+- The phone UI has a six-cell code input and one large hold surface. Its footer
+  places the green connection dot beside the pairing code, exposes a `RESTART
+  SESSION` command, and keeps level progress on a second compact row. Keep it
   visually minimal and do not restore the old overlapping center dot.
 - Mobile browsers automatically show the remote UI.
 - Desktop input mode is a segmented `REMOTE` / `CAMERA` control, with remote as
@@ -71,6 +75,10 @@ openness. A closed fist grabs; an open hand releases.
   camera-tracked fist closes over its start button.
 - Switching to camera closes and invalidates the pairing room. Switching back
   to remote creates a new room and pairing code.
+- Once a phone has connected in remote mode, disconnecting it pauses the active
+  run and freezes bug, particle, and spawn clocks. Reconnecting resumes the
+  same state without charging misses. This pause does not apply before a phone
+  has connected, so mouse input remains available for the initial demo.
 - Camera mode shows a small webcam preview in the bottom-right corner.
 
 ## Architecture
@@ -109,9 +117,10 @@ Remote to server:
 - `{ "type": "join-room", "room": "123456" }`
 - `{ "type": "input", "x": 0.5, "y": 0.5, "openness": 1,
   "motionIntensity": 0 }`
+- `{ "type": "restart-session" }`
 
 Server messages include `room-created`, `room-joined`, `room-not-found`,
-`room-closed`, `peer-status`, `input`, and `game-state`.
+`room-closed`, `peer-status`, `input`, `restart-session`, and `game-state`.
 
 ### Main Files
 

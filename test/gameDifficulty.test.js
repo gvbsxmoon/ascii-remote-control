@@ -15,7 +15,7 @@ test("difficulty curve has ten bounded, increasingly difficult levels", () => {
       spawn: getLevelProfile(1).spawnInterval,
       penalty: getLevelProfile(1).missPenalty,
     },
-    { lifetime: 6_000, spawn: 3_600, penalty: 100 },
+    { lifetime: 5_800, spawn: 3_200, penalty: 100 },
   );
   assert.deepEqual(
     {
@@ -23,7 +23,7 @@ test("difficulty curve has ten bounded, increasingly difficult levels", () => {
       spawn: getLevelProfile(10).spawnInterval,
       penalty: getLevelProfile(10).missPenalty,
     },
-    { lifetime: 4_000, spawn: 1_500, penalty: 280 },
+    { lifetime: 3_800, spawn: 1_300, penalty: 280 },
   );
 
   LEVEL_PROFILES.slice(1).forEach((profile, index) => {
