@@ -1,0 +1,252 @@
+@import url("https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap");
+
+:root {
+  font-family: "Share Tech Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  color: #fff;
+  background: #000;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.desktop-experience,
+.ascii-field {
+  position: fixed;
+  inset: 0;
+}
+
+.desktop-experience {
+  overflow: hidden;
+  background: #000;
+  cursor: none;
+}
+
+.ascii-field {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.desktop-pairing {
+  position: fixed;
+  z-index: 2;
+  top: 24px;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  transform: translateX(-50%);
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+
+.desktop-pairing.is-connected {
+  opacity: 0.42;
+}
+
+.desktop-pairing.is-connected .desktop-code {
+  display: none;
+}
+
+.desktop-pairing__status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9px;
+}
+
+.desktop-pairing__status i,
+.remote-header i {
+  width: 5px;
+  height: 5px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.desktop-pairing.is-connected .desktop-pairing__status,
+.remote-header i.is-online {
+  color: #39ff14;
+}
+
+.desktop-pairing.is-connected .desktop-pairing__status i,
+.remote-header i.is-online {
+  background: #39ff14;
+  box-shadow: 0 0 8px #39ff14;
+}
+
+.desktop-code,
+.code-inputs {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.desktop-code {
+  gap: 5px;
+}
+
+.desktop-code span {
+  display: grid;
+  width: 28px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  background: #000;
+  color: #fff;
+  font-size: 18px;
+}
+
+.mobile-remote {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  min-height: 100dvh;
+  grid-template-rows: 52px minmax(0, 1fr) 46px;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+.code-entry {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
+  padding-inline: 18px;
+}
+
+.remote-status {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 10px;
+}
+
+.code-entry--invalid .remote-status {
+  color: #39ff14;
+}
+
+.code-inputs {
+  width: min(100%, 360px);
+  gap: clamp(5px, 2vw, 10px);
+}
+
+.code-inputs input {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 0.76;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 0;
+  outline: 0;
+  background: #000;
+  color: #fff;
+  caret-color: #39ff14;
+  font-size: clamp(22px, 8vw, 34px);
+  text-align: center;
+}
+
+.code-inputs input:focus {
+  border-color: #39ff14;
+  box-shadow: inset 0 -2px #39ff14;
+}
+
+.remote-header,
+.remote-footer {
+  display: flex;
+  align-items: center;
+  padding-inline: 18px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 10px;
+}
+
+.remote-header {
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.remote-footer {
+  justify-content: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.remote-pad {
+  position: relative;
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  width: min(68vw, 320px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 50%;
+  outline: 0;
+  background: #000;
+  color: rgba(255, 255, 255, 0.7);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.remote-pad::before,
+.remote-pad::after {
+  position: absolute;
+  border-radius: 50%;
+  content: "";
+}
+
+.remote-pad::before {
+  inset: 12%;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+}
+
+.remote-pad::after {
+  width: 7px;
+  height: 7px;
+  border: 1px solid currentColor;
+}
+
+.remote-pad span {
+  font-size: 11px;
+}
+
+.mobile-remote.is-pressed .remote-pad {
+  border-color: #39ff14;
+  color: #39ff14;
+  box-shadow: inset 0 0 42px rgba(57, 255, 20, 0.08);
+}
+
+.mobile-remote.is-pressed .remote-pad::after {
+  background: #39ff14;
+  box-shadow: 0 0 12px #39ff14;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .mobile-remote {
+    grid-template-rows: 42px minmax(0, 1fr) 36px;
+  }
+
+  .remote-pad {
+    width: min(52vh, 280px);
+  }
+}
