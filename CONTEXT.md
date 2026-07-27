@@ -38,22 +38,28 @@ openness. A closed fist grabs; an open hand releases.
 - 9px Share Tech Mono characters at low white opacity.
 - Sparse random neon-green character flashes.
 - 32px black cursor with a thin white border.
-- Bright red bug blocks with a six-second lifetime.
+- Bright red bug blocks with a level-dependent four-to-six-second lifetime.
 - A glowing red line oscillates between the cursor and a bug within grab range.
 - The cursor grows from a 32px to a 48px radius only while directly over a bug,
   and becomes translucent so the bug remains visible beneath it.
+- A grabbed bug changes the cursor to a glowing red lock state with a rotating
+  dashed ring.
 - Thrown characters use velocity-based physics and fade out as particles.
 - Score, misses, level, active bugs, and game status are tracked.
-- Bugs begin spawning after 1.2 seconds, with shorter intervals at higher
-  levels.
+- The run has ten levels driven by an exponential difficulty curve. Bug
+  lifetime drops from 6.0 to 4.0 seconds and spawn intervals from 3.6 to 1.5
+  seconds, while simultaneous bug capacity grows from one to four.
 - A level requires five consecutive bug fixes. Missing a bug resets level
-  progress and deducts 100 points.
+  progress and deducts `100 + 20 * (level - 1)` points.
+- Captures become more valuable at higher levels, and fast captures receive a
+  proportional time bonus.
+- Clearing five bugs at level ten completes the run with `SYSTEM CLEAN`.
 - Five missed bugs trigger game over with a random hostile message. Mouse
   click, remote touch, or closing the tracked hand restarts the game.
 - Status values include `WAITING`, `HEALTHY`, `BUG DETECTED`,
-  `BUG CAPTURED`, `BUG MISSED`, `LEVEL UP`, and `GAME OVER`.
-- Game state, level progress, misses, and game over are mirrored on the paired
-  phone.
+  `BUG CAPTURED`, `BUG MISSED`, `LEVEL UP`, `GAME OVER`, and `SYSTEM CLEAN`.
+- Game state, level progress, misses, game over, and completion are mirrored on
+  the paired phone.
 - The phone UI has a six-cell code input and one large hold surface. Keep it
   visually minimal and do not restore the old overlapping center dot.
 - Mobile browsers automatically show the remote UI.
@@ -117,6 +123,8 @@ Server messages include `room-created`, `room-joined`, `room-not-found`,
 - `src/components/CameraInput.jsx`: webcam lifecycle and camera preview.
 - `src/hooks/useCameraHand.js`: MediaPipe Hand Landmarker setup, palm center,
   and openness estimation.
+- `src/lib/gameDifficulty.js`: immutable level profiles and the exponential
+  difficulty curve.
 - `src/lib/realtime.js`: same-origin WebSocket URL and JSON send helper.
 - `src/index.css`: all desktop and mobile styling.
 - `render.yaml`: Render Blueprint for the Node web service.
@@ -150,6 +158,7 @@ Open `http://localhost:5173`.
 Before committing:
 
 ```bash
+npm test
 npm run lint
 npm run build
 ```

@@ -210,6 +210,7 @@ function forwardGameState(client, message) {
     ),
     misses: Math.max(0, Math.floor(Number(message.misses) || 0)),
     level: Math.max(1, Math.floor(Number(message.level) || 1)),
+    maxLevel: Math.max(1, Math.floor(Number(message.maxLevel) || 10)),
     levelProgress: Math.max(
       0,
       Math.floor(Number(message.levelProgress) || 0),
@@ -220,6 +221,8 @@ function forwardGameState(client, message) {
     status: String(message.status || "WAITING").slice(0, 24),
     gameOver: Boolean(message.gameOver),
     gameOverMessage: String(message.gameOverMessage || "").slice(0, 96),
+    gameWon: Boolean(message.gameWon),
+    gameWonMessage: String(message.gameWonMessage || "").slice(0, 96),
   };
   send(room.remote, room.gameState);
 }

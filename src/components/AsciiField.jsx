@@ -1,4 +1,10 @@
 import { useEffect, useRef } from "react";
+import {
+  FIXES_PER_LEVEL,
+  getLevelProfile,
+  MAX_LEVEL,
+  MAX_MISSES,
+} from "../lib/gameDifficulty";
 
 const CHARACTERS = "@%#*+=-:.?01/\\|{}[]()<>$&;";
 const CELL_WIDTH = 9;
@@ -10,15 +16,11 @@ const OPEN_THRESHOLD = 0.58;
 const INPUT_TIMEOUT = 600;
 const PARTICLE_LIFETIME = 1_100;
 const MAX_THROW_SPEED = 1_800;
-const BUG_LIFETIME = 6_000;
 const PROXIMITY_DISTANCE = 180;
 const FIRST_BUG_DELAY = 1_200;
-const BASE_SPAWN_INTERVAL = 3_800;
-const MIN_SPAWN_INTERVAL = 2_200;
-const FIXES_PER_LEVEL = 5;
-const MAX_MISSES = 5;
-const MISSED_BUG_PENALTY = 100;
+const LEVEL_TRANSITION_DELAY = 1_800;
 const BUG_COLORS = ["#ff2d2d", "#ff665c"];
+const GAME_WON_MESSAGE = "TEN LEVELS. PRODUCTION SURVIVED.";
 const GAME_OVER_MESSAGES = [
   "YOU SHOULDN'T BE WORKING HERE.",
   "ASK CLAUDE TO FIX THIS, PLEASE.",
@@ -127,6 +129,7 @@ export function AsciiField({
     let statusUntil = 0;
     let gameOver = false;
     let gameOverMessage = "";
+    let gameWon = false;
     let lastPublishedState = "";
 
     function configureText(target) {
@@ -176,7 +179,7 @@ export function AsciiField({
       bugs = [];
       heldBug = null;
       heldCharacters = [];
-      if (gameStartedAt > 0 && !gameOver) {
+      if (gameStartedAt > 0 && !gameOver && !gameWon) {
         nextBugAt = performance.now() + FIRST_BUG_DELAY;
         status = "HEALTHY";
       }
@@ -247,29 +250,39 @@ export function AsciiField({
         });
       });
 
-      const timeBonus = heldBug
-        ? Math.max(0, Math.ceil((heldBug.expiresAt - time) / 1_000)) * 10
+      const profile = getLevelProfile(level);
+      const remainingRatio = heldBug
+        ? Math.max(0, (heldBug.expiresAt - time) / heldBug.lifetime)
         : 0;
-      score += 100 + timeBonus;
+      const timeBonus =
+        Math.round((remainingRatio * profile.captureReward * 0.5) / 10) * 10;
+      score += profile.captureReward + timeBonus;
       levelProgress += 1;
       heldBug = null;
       heldCharacters = [];
-      nextBugAt = Math.min(nextBugAt, time + 1_200);
 
       if (levelProgress >= FIXES_PER_LEVEL) {
-        level += 1;
-        levelProgress = 0;
-        status = "LEVEL UP";
-        statusUntil = time + 1_600;
+        if (level >= MAX_LEVEL) {
+          levelProgress = FIXES_PER_LEVEL;
+          completeGame(time);
+        } else {
+          level += 1;
+          levelProgress = 0;
+          status = "LEVEL UP";
+          statusUntil = time + LEVEL_TRANSITION_DELAY;
+          nextBugAt = time + LEVEL_TRANSITION_DELAY;
+        }
       } else {
+        nextBugAt = Math.min(nextBugAt, time + profile.successDelay);
         status = bugs.length > 0 ? "BUG DETECTED" : "HEALTHY";
         statusUntil = time + 1_200;
       }
     }
 
     function spawnBug(time) {
-      if (gameOver) return;
+      if (gameOver || gameWon) return;
 
+      const profile = getLevelProfile(level);
       const widthInCells = 5 + Math.floor(Math.random() * 4);
       const heightInCells = 3 + Math.floor(Math.random() * 3);
       let x;
@@ -315,7 +328,9 @@ export function AsciiField({
         bounds: { left, right, top, bottom },
         cells: bugCells,
         spawnedAt: time,
-        expiresAt: time + BUG_LIFETIME,
+        lifetime: profile.bugLifetime,
+        expiresAt: time + profile.bugLifetime,
+        missPenalty: profile.missPenalty,
       });
       status = "BUG DETECTED";
       statusUntil = 0;
@@ -327,6 +342,7 @@ export function AsciiField({
         score,
         misses,
         level,
+        maxLevel: MAX_LEVEL,
         levelProgress,
         levelTarget: FIXES_PER_LEVEL,
         maxMisses: MAX_MISSES,
@@ -334,6 +350,8 @@ export function AsciiField({
         status,
         gameOver,
         gameOverMessage,
+        gameWon,
+        gameWonMessage: gameWon ? GAME_WON_MESSAGE : "",
       };
       const serialized = JSON.stringify(nextState);
       if (serialized === lastPublishedState) return;
@@ -341,16 +359,7 @@ export function AsciiField({
       onGameStateChangeRef.current?.(nextState);
     }
 
-    function endGame(time) {
-      gameOver = true;
-      gameOverMessage =
-        GAME_OVER_MESSAGES[
-          Math.floor(Math.random() * GAME_OVER_MESSAGES.length)
-        ];
-      status = "GAME OVER";
-      statusUntil = Number.POSITIVE_INFINITY;
-      nextBugAt = Number.POSITIVE_INFINITY;
-
+    function clearActiveBugs(time) {
       bugs.forEach((bug) => {
         bug.cells.forEach((cell) => {
           cell.bugId = null;
@@ -364,16 +373,28 @@ export function AsciiField({
       wallDirty = true;
     }
 
+    function endGame(time) {
+      gameOver = true;
+      gameOverMessage =
+        GAME_OVER_MESSAGES[
+          Math.floor(Math.random() * GAME_OVER_MESSAGES.length)
+        ];
+      status = "GAME OVER";
+      statusUntil = Number.POSITIVE_INFINITY;
+      nextBugAt = Number.POSITIVE_INFINITY;
+      clearActiveBugs(time);
+    }
+
+    function completeGame(time) {
+      gameWon = true;
+      status = "SYSTEM CLEAN";
+      statusUntil = Number.POSITIVE_INFINITY;
+      nextBugAt = Number.POSITIVE_INFINITY;
+      clearActiveBugs(time);
+    }
+
     function restartGame(time) {
-      bugs.forEach((bug) => {
-        bug.cells.forEach((cell) => {
-          cell.bugId = null;
-          cell.character = randomCharacter();
-        });
-      });
-      bugs = [];
-      heldBug = null;
-      heldCharacters = [];
+      clearActiveBugs(time);
       particles = [];
       score = 0;
       misses = 0;
@@ -383,6 +404,7 @@ export function AsciiField({
       statusUntil = 0;
       gameOver = false;
       gameOverMessage = "";
+      gameWon = false;
       gameStartedAt = time;
       nextBugAt = time + FIRST_BUG_DELAY;
       wallDirty = true;
@@ -390,7 +412,7 @@ export function AsciiField({
     }
 
     function updateGame(time, tracked) {
-      if (gameOver) {
+      if (gameOver || gameWon) {
         publishGameState();
         return;
       }
@@ -416,11 +438,18 @@ export function AsciiField({
         const expiredIds = new Set(expired.map((bug) => bug.id));
         bugs = bugs.filter((bug) => !expiredIds.has(bug.id));
         misses += expired.length;
-        score -= expired.length * MISSED_BUG_PENALTY;
+        score -= expired.reduce(
+          (total, bug) => total + bug.missPenalty,
+          0,
+        );
         levelProgress = 0;
         status = "BUG MISSED";
         statusUntil = time + 1_600;
-        nextBugAt = Math.min(nextBugAt, time + 800);
+        const profile = getLevelProfile(level);
+        nextBugAt = Math.min(
+          nextBugAt,
+          time + profile.missRecoveryDelay,
+        );
         wallDirty = true;
 
         if (misses >= MAX_MISSES) {
@@ -430,17 +459,14 @@ export function AsciiField({
         }
       }
 
-      const maximumBugs = Math.min(4, 1 + Math.floor((level - 1) / 2));
-      const spawnInterval = Math.max(
-        MIN_SPAWN_INTERVAL,
-        BASE_SPAWN_INTERVAL - (level - 1) * 250,
-      );
+      const profile = getLevelProfile(level);
+      const activeBugCount = bugs.length + (heldBug ? 1 : 0);
       if (time >= nextBugAt) {
-        if (bugs.length < maximumBugs && !heldBug) {
+        if (activeBugCount < profile.maxConcurrent) {
           spawnBug(time);
-          nextBugAt = time + spawnInterval;
+          nextBugAt = time + profile.spawnInterval;
         } else {
-          nextBugAt = time + 450;
+          nextBugAt = time + 300;
         }
       }
 
@@ -545,7 +571,7 @@ export function AsciiField({
     function drawBugs(time) {
       configureText(context);
       bugs.forEach((bug) => {
-        const remaining = Math.max(0, (bug.expiresAt - time) / BUG_LIFETIME);
+        const remaining = Math.max(0, (bug.expiresAt - time) / bug.lifetime);
         const urgency = 1 - remaining;
         const pulse =
           0.9 +
@@ -640,16 +666,32 @@ export function AsciiField({
       context.restore();
     }
 
-    function drawCursor(tracked) {
+    function drawCursor(tracked, time) {
       if (!tracked) return;
+      const grabbed = heldCharacters.length > 0;
       context.save();
       context.fillStyle = `rgba(0, 0, 0, ${cursor.fillOpacity})`;
-      context.strokeStyle = "rgba(255, 255, 255, 0.92)";
-      context.lineWidth = 0.75;
+      context.strokeStyle = grabbed
+        ? "#ff2d2d"
+        : "rgba(255, 255, 255, 0.92)";
+      context.lineWidth = grabbed ? 1.5 : 0.75;
+      context.shadowColor = grabbed ? "#ff2d2d" : "transparent";
+      context.shadowBlur = grabbed ? 8 : 0;
       context.beginPath();
       context.arc(cursor.x, cursor.y, cursor.radius, 0, Math.PI * 2);
       context.fill();
       context.stroke();
+
+      if (grabbed) {
+        context.shadowBlur = 4;
+        context.globalAlpha = 0.86;
+        context.lineWidth = 0.8;
+        context.setLineDash([3, 5]);
+        context.lineDashOffset = -time * 0.035;
+        context.beginPath();
+        context.arc(cursor.x, cursor.y, cursor.radius + 6, 0, Math.PI * 2);
+        context.stroke();
+      }
       context.restore();
     }
 
@@ -817,14 +859,19 @@ export function AsciiField({
         context.fillStyle = "#000000";
         context.fillRect(0, 0, size.width, size.height);
         context.drawImage(wallCanvas, 0, 0, size.width, size.height);
-        drawCursor(tracked);
+        drawCursor(tracked, time);
         frameId = requestAnimationFrame(render);
         return;
       }
 
-      const gameWasOver = gameOver;
+      const gameWasEnded = gameOver || gameWon;
       updateGame(time, tracked);
-      if (gameWasOver && gameOver && handClosed && !wasClosed) {
+      if (
+        gameWasEnded &&
+        (gameOver || gameWon) &&
+        handClosed &&
+        !wasClosed
+      ) {
         restartGame(time);
       }
       const nearest = findNearestBug();
@@ -833,13 +880,14 @@ export function AsciiField({
 
       if (
         !gameOver &&
+        !gameWon &&
         handClosed &&
         !wasClosed &&
         nearest.bug &&
         nearest.distance <= PROXIMITY_DISTANCE
       ) {
         grabBug(nearest.bug, time);
-      } else if (!gameOver && !handClosed && wasClosed) {
+      } else if (!gameOver && !gameWon && !handClosed && wasClosed) {
         releaseCharacters(time);
       }
       wasClosed = handClosed;
@@ -854,7 +902,7 @@ export function AsciiField({
       drawBugs(time);
       drawProximityLink(nearest, hoveredBug, tracked, time);
       drawParticles(time);
-      drawCursor(tracked);
+      drawCursor(tracked, time);
       drawHeld();
       frameId = requestAnimationFrame(render);
     }

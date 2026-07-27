@@ -33,6 +33,7 @@ export function DesktopExperience() {
     score: 0,
     misses: 0,
     level: 1,
+    maxLevel: 10,
     levelProgress: 0,
     levelTarget: 5,
     maxMisses: 5,
@@ -40,6 +41,8 @@ export function DesktopExperience() {
     status: "WAITING",
     gameOver: false,
     gameOverMessage: "",
+    gameWon: false,
+    gameWonMessage: "",
   });
   gameStateRef.current = gameState;
 
@@ -153,7 +156,8 @@ export function DesktopExperience() {
           {gameState.status}
         </strong>
         <span>
-          LVL {String(gameState.level).padStart(2, "0")}{" "}
+          LVL {String(gameState.level).padStart(2, "0")}/
+          {String(gameState.maxLevel).padStart(2, "0")}{" "}
           {gameState.levelProgress}/{gameState.levelTarget}
         </span>
         <span>ERR {gameState.misses}/{gameState.maxMisses}</span>
@@ -164,6 +168,17 @@ export function DesktopExperience() {
           <strong>GAME OVER</strong>
           <p>{gameState.gameOverMessage}</p>
           <span>CLICK, TOUCH OR CLOSE HAND TO REBOOT</span>
+        </section>
+      )}
+
+      {gameState.gameWon && (
+        <section
+          className="system-modal game-over game-complete"
+          aria-live="assertive"
+        >
+          <strong>SYSTEM CLEAN</strong>
+          <p>{gameState.gameWonMessage}</p>
+          <span>CLICK, TOUCH OR CLOSE HAND TO RESTART</span>
         </section>
       )}
 

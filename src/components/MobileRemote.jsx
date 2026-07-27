@@ -26,6 +26,7 @@ export function MobileRemote() {
     score: 0,
     misses: 0,
     level: 1,
+    maxLevel: 10,
     levelProgress: 0,
     levelTarget: 5,
     maxMisses: 5,
@@ -33,6 +34,8 @@ export function MobileRemote() {
     status: "WAITING",
     gameOver: false,
     gameOverMessage: "",
+    gameWon: false,
+    gameWonMessage: "",
   });
   const inputRefs = useRef([]);
   const socketRef = useRef(null);
@@ -346,9 +349,15 @@ export function MobileRemote() {
             onPointerCancel={endHold}
             onContextMenu={(event) => event.preventDefault()}
           >
-            <span className={gameState.gameOver ? "remote-pad__game-over" : ""}>
-              {gameState.gameOver
-                ? gameState.gameOverMessage
+            <span
+              className={
+                gameState.gameOver || gameState.gameWon
+                  ? `remote-pad__end-state ${gameState.gameWon ? "is-complete" : ""}`
+                  : ""
+              }
+            >
+              {gameState.gameOver || gameState.gameWon
+                ? gameState.gameOverMessage || gameState.gameWonMessage
                 : pressed
                   ? "HOLDING"
                   : "HOLD"}
@@ -361,10 +370,10 @@ export function MobileRemote() {
                 ? "MOTION DENIED"
                 : motionState === "requesting"
                   ? "ALLOW MOTION"
-                  : gameState.gameOver
+                  : gameState.gameOver || gameState.gameWon
                     ? "HOLD TO REBOOT"
                   : phase === "ready"
-                    ? `LVL ${String(gameState.level).padStart(2, "0")} ${gameState.levelProgress}/${gameState.levelTarget}`
+                    ? `LVL ${String(gameState.level).padStart(2, "0")}/${String(gameState.maxLevel).padStart(2, "0")} ${gameState.levelProgress}/${gameState.levelTarget}`
                     : "RECONNECTING"}
             </span>
           </footer>
