@@ -15,10 +15,12 @@ export function MobileRemote() {
   const [digits, setDigits] = useState(initialDigits);
   const [phase, setPhase] = useState("pairing");
   const [pressed, setPressed] = useState(false);
+  const [motionState, setMotionState] = useState("idle");
   const inputRefs = useRef([]);
   const socketRef = useRef(null);
   const joinedRef = useRef(false);
   const holdRef = useRef(false);
+  const sensorPermissionRef = useRef(null);
   const sensorRef = useRef({
     active: false,
     neutralBeta: null,
@@ -179,31 +181,45 @@ export function MobileRemote() {
 
   async function enableSensors() {
     if (sensorRef.current.active) return true;
+    if (sensorPermissionRef.current) return sensorPermissionRef.current;
 
-    try {
-      const permissionRequests = [];
-      if (typeof DeviceOrientationEvent.requestPermission === "function") {
-        permissionRequests.push(DeviceOrientationEvent.requestPermission());
-      }
-      if (typeof DeviceMotionEvent.requestPermission === "function") {
-        permissionRequests.push(DeviceMotionEvent.requestPermission());
-      }
+    sensorPermissionRef.current = (async () => {
+      try {
+        setMotionState("requesting");
+        const orientationApi = window.DeviceOrientationEvent;
+        const motionApi = window.DeviceMotionEvent;
 
-      const permissions = await Promise.all(permissionRequests);
-      if (permissions.some((permission) => permission !== "granted")) {
-        throw new Error("Motion permission denied");
-      }
+        if (!orientationApi && !motionApi) {
+          throw new Error("Motion sensors are not available");
+        }
 
-      sensorRef.current.active = true;
-      sensorRef.current.neutralBeta = null;
-      sensorRef.current.neutralGamma = null;
-      navigator.wakeLock?.request("screen").catch(() => {});
-      return true;
-    } catch (error) {
-      console.error("Unable to enable motion sensors:", error);
-      setPhase("sensor-error");
-      return false;
-    }
+        const permissionRequests = [];
+        if (typeof orientationApi?.requestPermission === "function") {
+          permissionRequests.push(orientationApi.requestPermission());
+        }
+        if (typeof motionApi?.requestPermission === "function") {
+          permissionRequests.push(motionApi.requestPermission());
+        }
+
+        const permissions = await Promise.all(permissionRequests);
+        if (permissions.some((permission) => permission !== "granted")) {
+          throw new Error("Motion permission denied");
+        }
+
+        sensorRef.current.active = true;
+        sensorRef.current.neutralBeta = null;
+        sensorRef.current.neutralGamma = null;
+        setMotionState("granted");
+        navigator.wakeLock?.request("screen").catch(() => {});
+        return true;
+      } catch (error) {
+        console.error("Unable to enable motion sensors:", error);
+        setMotionState("denied");
+        return false;
+      }
+    })();
+
+    return sensorPermissionRef.current;
   }
 
   async function beginHold(event) {
@@ -228,13 +244,12 @@ export function MobileRemote() {
 
   function updateDigit(index, value) {
     const digit = value.replace(/\D/g, "").slice(-1);
-    setDigits((current) => {
-      const next = [...current];
-      next[index] = digit;
-      return next;
-    });
+    const next = [...digits];
+    next[index] = digit;
+    setDigits(next);
     if (phase === "invalid") setPhase("pairing");
     if (digit && index < 5) inputRefs.current[index + 1]?.focus();
+    if (next.every(Boolean)) void enableSensors();
   }
 
   function handleKeyDown(index, event) {
@@ -250,11 +265,16 @@ export function MobileRemote() {
       .slice(0, 6);
     if (!pasted) return;
     event.preventDefault();
-    setDigits(Array.from({ length: 6 }, (_, index) => pasted[index] || ""));
+    const next = Array.from(
+      { length: 6 },
+      (_, index) => pasted[index] || "",
+    );
+    setDigits(next);
     inputRefs.current[Math.min(pasted.length, 5)]?.focus();
+    if (next.every(Boolean)) void enableSensors();
   }
 
-  const paired = ["ready", "waiting", "offline", "sensor-error"].includes(phase);
+  const paired = ["ready", "waiting", "offline"].includes(phase);
 
   return (
     <main className={`mobile-remote ${pressed ? "is-pressed" : ""}`}>
@@ -303,8 +323,10 @@ export function MobileRemote() {
             <span>{pressed ? "HOLDING" : "HOLD"}</span>
           </button>
           <footer className="remote-footer">
-            {phase === "sensor-error"
+            {motionState === "denied"
               ? "MOTION DENIED"
+              : motionState === "requesting"
+                ? "ALLOW MOTION"
               : phase === "ready"
                 ? "REMOTE ONLINE"
                 : "RECONNECTING"}

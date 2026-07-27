@@ -60,7 +60,9 @@ input {
 }
 
 .desktop-pairing.is-connected {
-  opacity: 0.42;
+  padding: 5px 8px;
+  background: #000;
+  opacity: 1;
 }
 
 .desktop-pairing.is-connected .desktop-code {
