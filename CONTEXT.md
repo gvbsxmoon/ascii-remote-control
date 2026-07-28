@@ -4,12 +4,13 @@ Use this document as the handoff for a new Codex thread.
 
 ## Repository
 
-- Local path: `/Users/natalelu/Developer/explorations/AsciiRemote`
+- Local path: `/Users/natalelu/Developer/exploration/motion-based-controls/test-cases/ascii-remote`
 - GitHub: `git@github.com:gvbsxmoon/ascii-remote-control.git`
 - Main branch: `main`
 - Baseline feature commit: `d601f11`
-- This is a standalone project. Do not mix it with the neighboring `PinchMe`
-  exploration.
+- This is an independently runnable test case inside the
+  `motion-based-controls` exploration. Shared research conclusions belong in
+  the parent track; do not mix its code with the neighboring `pinch-me` case.
 
 ## Product
 
