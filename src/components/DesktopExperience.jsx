@@ -9,7 +9,7 @@ function formatScore(score) {
   return value < 0 ? `-${digits.padStart(4, "0")}` : digits.padStart(5, "0");
 }
 
-export function DesktopExperience() {
+export function DesktopExperience({ isFireTv = false }) {
   const inputRef = useRef({
     tracked: false,
     x: 0.5,
@@ -24,6 +24,7 @@ export function DesktopExperience() {
   const gameStateRef = useRef(null);
   const introButtonRef = useRef(null);
   const introCursorRef = useRef(null);
+  const reloadButtonRef = useRef(null);
   const [inputMode, setInputMode] = useState("remote");
   const [introOpen, setIntroOpen] = useState(true);
   const [room, setRoom] = useState("");
@@ -136,7 +137,16 @@ export function DesktopExperience() {
     !gameState.gameOver &&
     !gameState.gameWon;
 
+  useEffect(() => {
+    if (!remoteSessionPaused || introOpen) return undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      reloadButtonRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [introOpen, remoteSessionPaused]);
+
   function selectInputMode(mode) {
+    if (isFireTv && mode === "camera") return;
     if (mode === modeRef.current) return;
     modeRef.current = mode;
     setInputMode(mode);
@@ -164,7 +174,9 @@ export function DesktopExperience() {
         cursorOverlayRef={introCursorRef}
         onDismiss={dismissIntro}
       />
-      {inputMode === "camera" && <CameraInput inputRef={inputRef} />}
+      {!isFireTv && inputMode === "camera" && (
+        <CameraInput inputRef={inputRef} />
+      )}
 
       <section className="game-hud" aria-live="polite">
         <span>SCORE {formatScore(gameState.score)}</span>
@@ -199,10 +211,23 @@ export function DesktopExperience() {
       )}
 
       {remoteSessionPaused && !introOpen && (
-        <section className="system-modal remote-paused" aria-live="assertive">
+        <section
+          className="system-modal remote-paused"
+          role="dialog"
+          aria-modal="true"
+          aria-live="assertive"
+        >
           <strong>SESSION PAUSED</strong>
           <p>REMOTE DISCONNECTED</p>
           <span>RECONNECT TO CONTINUE</span>
+          <button
+            ref={reloadButtonRef}
+            type="button"
+            autoFocus
+            onClick={() => window.location.reload()}
+          >
+            RELOAD DISPLAY
+          </button>
         </section>
       )}
 
@@ -220,18 +245,23 @@ export function DesktopExperience() {
                 ? "MOVE YOUR HAND TO AIM. CLOSE TO GRAB. MOVE, THEN OPEN TO THROW."
                 : remoteConnected
                   ? "TILT TO AIM. HOLD TO GRAB. MOVE, THEN RELEASE TO THROW."
-                  : "PAIR A REMOTE OR USE THE MOUSE. GRAB, DRAG, THEN RELEASE."}
+                  : isFireTv
+                    ? "PAIR A REMOTE. GRAB, MOVE, THEN RELEASE."
+                    : "PAIR A REMOTE OR USE THE MOUSE. GRAB, DRAG, THEN RELEASE."}
             </p>
             <button
               ref={introButtonRef}
               type="button"
+              autoFocus
               onClick={dismissIntro}
             >
               {inputMode === "camera"
                 ? "AIM HERE + CLOSE FIST"
                 : remoteConnected
                   ? "TOUCH REMOTE OR CLICK"
-                  : "CLICK TO START"}
+                  : isFireTv
+                    ? "PRESS SELECT TO START"
+                    : "CLICK TO START"}
             </button>
           </section>
         </div>
@@ -263,24 +293,26 @@ export function DesktopExperience() {
         </div>
       </section>
 
-      <div className="input-mode" role="group" aria-label="Input mode">
-        <button
-          type="button"
-          className={inputMode === "remote" ? "is-active" : ""}
-          disabled={!introOpen}
-          onClick={() => selectInputMode("remote")}
-        >
-          REMOTE
-        </button>
-        <button
-          type="button"
-          className={inputMode === "camera" ? "is-active" : ""}
-          disabled={!introOpen}
-          onClick={() => selectInputMode("camera")}
-        >
-          CAMERA
-        </button>
-      </div>
+      {!isFireTv && (
+        <div className="input-mode" role="group" aria-label="Input mode">
+          <button
+            type="button"
+            className={inputMode === "remote" ? "is-active" : ""}
+            disabled={!introOpen}
+            onClick={() => selectInputMode("remote")}
+          >
+            REMOTE
+          </button>
+          <button
+            type="button"
+            className={inputMode === "camera" ? "is-active" : ""}
+            disabled={!introOpen}
+            onClick={() => selectInputMode("camera")}
+          >
+            CAMERA
+          </button>
+        </div>
+      )}
     </main>
   );
 }

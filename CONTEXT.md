@@ -73,10 +73,12 @@ openness. A closed fist grabs; an open hand releases.
   places the green connection dot beside the pairing code, exposes a `RESTART
   SESSION` command, and keeps level progress on a second compact row. Keep it
   visually minimal and do not restore the old overlapping center dot.
-- Mobile browsers automatically show the remote UI.
+- Mobile browsers automatically show the remote UI. Fire TV user agents are
+  detected before the generic Android check and always show the display UI.
 - Desktop input mode is a segmented `REMOTE` / `CAMERA` control, with remote as
   the default. It can only be changed while the intro modal is open and locks
   for the entire run when the game starts.
+- Fire TV does not render the input-mode selector or initialize camera mode.
 - An intro modal pauses the game until mouse click, paired remote touch, or a
   camera-tracked fist closes over its start button.
 - Switching to camera closes and invalidates the pairing room. Switching back
@@ -84,7 +86,9 @@ openness. A closed fist grabs; an open hand releases.
 - Once a phone has connected in remote mode, disconnecting it pauses the active
   run and freezes bug, particle, and spawn clocks. Reconnecting resumes the
   same state without charging misses. This pause does not apply before a phone
-  has connected, so mouse input remains available for the initial demo.
+  has connected, so mouse input remains available for the initial demo. The
+  disconnect modal also exposes a focused `RELOAD DISPLAY` button for Fire TV
+  D-pad recovery.
 - Camera mode shows a small webcam preview in the bottom-right corner.
 
 ## Architecture
@@ -144,6 +148,7 @@ Server messages include `room-created`, `room-joined`, `room-not-found`,
   difficulty curve.
 - `src/lib/gameInteraction.js`: proximity, grab, and minimum extraction
   thresholds shared with focused unit tests.
+- `src/lib/device.js`: Fire TV, mobile, and desktop user-agent classification.
 - `src/lib/remoteMotion.js`: phone tilt mapping, dead zone, and speed-limited
   smoothing.
 - `src/lib/realtime.js`: same-origin WebSocket URL and JSON send helper.
@@ -176,6 +181,7 @@ Open `http://localhost:5173`.
 
 - Force desktop: `?demo=desktop`
 - Force phone remote: `?demo=remote`
+- Force Fire TV display behavior: `?demo=firetv`
 
 Before committing:
 

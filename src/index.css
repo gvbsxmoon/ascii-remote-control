@@ -128,12 +128,33 @@ input {
   left: 50%;
   border-color: rgba(168, 85, 247, 0.72);
   transform: translate(-50%, -50%);
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .remote-paused strong {
   color: #a855f7;
   text-shadow: 0 0 10px rgba(168, 85, 247, 0.64);
+}
+
+.remote-paused button {
+  min-width: 148px;
+  height: 30px;
+  padding-inline: 12px;
+  border: 1px solid rgba(168, 85, 247, 0.64);
+  border-radius: 0;
+  outline: 0;
+  background: #000;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.remote-paused button:hover,
+.remote-paused button:focus,
+.remote-paused button:focus-visible {
+  border-color: #a855f7;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
 }
 
 .game-complete {

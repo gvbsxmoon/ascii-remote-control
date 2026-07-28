@@ -14,6 +14,9 @@ Open `http://localhost:5173` on the display. On a phone, open the same public
 URL, enter the six-digit pairing code, then hold and release the central control
 to grab and throw ASCII characters.
 
+Use `?demo=remote`, `?demo=desktop`, or `?demo=firetv` to force a device mode
+during local testing.
+
 ## Render
 
 The included `render.yaml` creates a Node web service that serves the Vite build
