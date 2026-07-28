@@ -4,12 +4,12 @@ Use this document as the handoff for a new Codex thread.
 
 ## Repository
 
-- Local path: `/Users/natalelu/Developer/discoveries/AsciiRemote`
+- Local path: `/Users/natalelu/Developer/explorations/AsciiRemote`
 - GitHub: `git@github.com:gvbsxmoon/ascii-remote-control.git`
 - Main branch: `main`
 - Baseline feature commit: `d601f11`
 - This is a standalone project. Do not mix it with the neighboring `PinchMe`
-  discovery.
+  exploration.
 
 ## Product
 
